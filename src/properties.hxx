@@ -56,3 +56,18 @@ template <class G, class K>
 inline void degreesW(vector<K>& a, const G& x) {
   x.forEachVertexKey([&](auto u) { a[u] = x.degree(u); });
 }
+
+
+template <class G, class K>
+inline vector<K> communities(const G& x, const vector<K>& vcom) {
+  size_t S = x.span();
+  vector<K> vcs;
+  vector<char> cflag(S);
+  x.forEachVertexKey([&](auto u) {
+    K c = vcom[u];
+    if (cflag[c]) return;
+    cflag[c] = 1;
+    vcs.push_back(c);
+  });
+  return vcs;
+}

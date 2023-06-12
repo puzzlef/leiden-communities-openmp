@@ -62,8 +62,10 @@ void runExperiment(const G& x) {
   // Get community memberships on original graph (static).
   auto a0 = louvainStaticOmp(x, init, {repeat});
   flog(a0, "louvainStaticOmp");
-  auto b0 = leidenStaticOmp (x, init, {repeat});
-  flog(b0, "leidenStaticOmp");
+  auto b0 = leidenStaticOmp<false>(rnd, x, init, {repeat});
+  flog(b0, "leidenStaticOmpGreedy");
+  auto b1 = leidenStaticOmp<true> (rnd, x, init, {repeat});
+  flog(b1, "leidenStaticOmpRandom");
 }
 
 

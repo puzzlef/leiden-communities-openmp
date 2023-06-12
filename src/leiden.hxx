@@ -1,5 +1,6 @@
 #pragma once
 #include <utility>
+#include <random>
 #include <algorithm>
 #include <vector>
 #include "_main.hxx"
@@ -15,6 +16,7 @@
 using std::pair;
 using std::tuple;
 using std::vector;
+using std::uniform_int_distribution;
 using std::make_pair;
 using std::move;
 using std::get;
@@ -98,6 +100,36 @@ inline void leidenFreeHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& v
     delete vcs[i];
     delete vcout[i];
   }
+}
+
+
+
+
+// LEIDEN RNGS
+// -----------
+
+/**
+ * Allocate a number of random number generators.
+ * @param rng per-thread random number generators (updated)
+ * @param rnd random number generator for seeding
+ */
+template <class RND>
+inline void leidenAllocateRngsW(vector<xorshift32_engine*>& rng, RND& rnd) {
+  uniform_int_distribution<uint32_t> dis(0, UINT32_MAX);
+  size_t N = rng.size();
+  for (size_t i=0; i<N; ++i)
+    rng[i] = new xorshift32_engine(dis(rnd));
+}
+
+
+/**
+ * Free a number of random number generators.
+ * @param rng per-thread random number generators (updated)
+ */
+inline void leidenFreeRngsW(vector<xorshift32_engine*>& rng) {
+  size_t N = rng.size();
+  for (size_t i=0; i<N; ++i)
+    delete rng[i];
 }
 
 
@@ -442,6 +474,7 @@ inline void leidenClearScanW(vector<K>& vcs, vector<W>& vcout) {
 
 /**
  * Choose connected community with best delta modularity.
+ * @param rng random number generator
  * @param x original graph
  * @param u given vertex
  * @param vcom community each vertex belongs to
@@ -453,14 +486,31 @@ inline void leidenClearScanW(vector<K>& vcs, vector<W>& vcout) {
  * @param R resolution (0, 1]
  * @returns [best community, delta modularity]
  */
-template <bool SELF=false, class G, class K, class W>
-inline auto leidenChooseCommunity(const G& x, K u, const vector<K>& vcom, const vector<W>& vtot, const vector<W>& ctot, const vector<K>& vcs, const vector<W>& vcout, double M, double R) {
+template <bool SELF=false, bool RANDOM=false, class G, class K, class W>
+inline auto leidenChooseCommunity(xorshift32_engine& rng, const G& x, K u, const vector<K>& vcom, const vector<W>& vtot, const vector<W>& ctot, const vector<K>& vcs, const vector<W>& vcout, double M, double R) {
   K cmax = K(), d = vcom[u];
   W emax = W();
-  for (K c : vcs) {
-    if (!SELF && c==d) continue;
-    W e = deltaModularity(vcout[c], vcout[d], vtot[u], ctot[c], ctot[d], M, R);
-    if (e>emax) { emax = e; cmax = c; }
+  if (RANDOM) {
+    W esum = W(), etil = W();
+    for (K c : vcs) {
+      if (!SELF && c==d) continue;
+      W e = deltaModularity(vcout[c], vcout[d], vtot[u], ctot[c], ctot[d], M, R);
+      if (e>0) esum += e;
+    }
+    W esel = ((rng() & 0xFFFF)/W(65536.0)) * esum;
+    for (K c : vcs) {
+      if (!SELF && c==d) continue;
+      W e = deltaModularity(vcout[c], vcout[d], vtot[u], ctot[c], ctot[d], M, R);
+      if (e>0) { etil += e; cmax = c; emax = e; }
+      if (esel>etil) break;
+    }
+  }
+  else {
+    for (K c : vcs) {
+      if (!SELF && c==d) continue;
+      W e = deltaModularity(vcout[c], vcout[d], vtot[u], ctot[c], ctot[d], M, R);
+      if (e>emax) { emax = e; cmax = c; }
+    }
   }
   return make_pair(cmax, emax);
 }
@@ -508,6 +558,7 @@ inline void leidenChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G&
  * @param vaff is vertex affected flag (updated)
  * @param vcs communities vertex u is linked to (temporary buffer, updated)
  * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
+ * @param rng random number generator
  * @param x original graph
  * @param vcob community bound each vertex belongs to
  * @param vtot total edge weight of each vertex
@@ -517,8 +568,8 @@ inline void leidenChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G&
  * @param fc has local moving phase converged?
  * @returns iterations performed (0 if converged already)
  */
-template <bool REFINE=false, class G, class K, class W, class B, class FC>
-inline int leidenMoveW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<K>& vcs, vector<W>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
+template <bool REFINE=false, bool RANDOM=false, class G, class K, class W, class B, class FC>
+inline int leidenMoveW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<K>& vcs, vector<W>& vcout, xorshift32_engine& rng, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
   int l = 0;
   W  el = W();
   for (; l<L;) {
@@ -527,8 +578,7 @@ inline int leidenMoveW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector
       if (!vaff[u]) return;
       leidenClearScanW(vcs, vcout);
       leidenScanCommunitiesW<false, REFINE>(vcs, vcout, x, u, vcom, vcob);
-      // TODO: Option for randomized selection (during REFINE).
-      auto [c, e] = leidenChooseCommunity(x, u, vcom, vtot, ctot, vcs, vcout, M, R);
+      auto [c, e] = leidenChooseCommunity<false, RANDOM>(rng, x, u, vcom, vtot, ctot, vcs, vcout, M, R);
       if (c)      { leidenChangeCommunityW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
       vaff[u] = B();
       el += e;  // l1-norm
@@ -539,8 +589,8 @@ inline int leidenMoveW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector
 }
 
 #ifdef OPENMP
-template <bool REFINE=false, class G, class K, class W, class B, class FC>
-inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
+template <bool REFINE=false, bool RANDOM=false, class G, class K, class W, class B, class FC>
+inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, vector<xorshift32_engine*>& rng, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
   size_t S = x.span();
   int l = 0;
   W  el = W();
@@ -553,8 +603,7 @@ inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vec
       if (!vaff[u]) continue;
       leidenClearScanW(*vcs[t], *vcout[t]);
       leidenScanCommunitiesW<false, REFINE>(*vcs[t], *vcout[t], x, u, vcom, vcob);
-      // TODO: Option for randomized selection (during REFINE).
-      auto [c, e] = leidenChooseCommunity(x, u, vcom, vtot, ctot, *vcs[t], *vcout[t], M, R);
+      auto [c, e] = leidenChooseCommunity<false, RANDOM>(*rng[t], x, u, vcom, vtot, ctot, *vcs[t], *vcout[t], M, R);
       if (c)      { leidenChangeCommunityOmpW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
       vaff[u] = B();
       el += e;  // l1-norm
@@ -651,14 +700,15 @@ inline auto leidenAggregateOmp(vector<vector<K>*>& vcs, vector<vector<W>*>& vcou
 
 /**
  * Find the community each vertex belongs to.
+ * @param rnd random number generator
  * @param x original graph
  * @param q initial community each vertex belongs to
  * @param o leiden options
  * @param fm marking affected vertices / preprocessing to be performed (vaff)
  * @returns community each vertex belongs to
  */
-template <class FLAG=char, class G, class K, class FM>
-auto leidenSeq(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class FM>
+auto leidenSeq(RND& rnd, const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   using  W = LEIDEN_WEIGHT_TYPE;
   using  B = FLAG;
   double R = o.resolution;
@@ -666,11 +716,13 @@ auto leidenSeq(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   int    P = o.maxPasses, p = 0, s = 0;
   size_t S = x.span();
   double M = edgeWeight(x)/2;
+  vector<xorshift32_engine*> rng(1);
   vector<K> vcom(S), vcs, a(S);
   vector<W> vtot(S), ctot(S), vcout(S);
   vector<K> co(S+1), ce(S), cn(S);
   vector<B> vaff(S);
   vector<K> vcob(S);
+  leidenAllocateRngsW(rng, rnd);
   float tm = 0;
   float t  = measureDurationMarked([&](auto mark) {
     double E  = o.tolerance;
@@ -689,9 +741,9 @@ auto leidenSeq(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
       for (l=0, p=0, s=0; M>0 && p<P;) {
         const G& g = s==0? x : y;
         int m = 0;
-        m += leidenMoveW<false>(vcob, ctot, vaff, vcs, vcout, g, vcob, vtot, M, R, L, fc);
+        m += leidenMoveW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, *rng[0], g, vcob, vtot, M, R, L, fc);
         leidenInitializeCommunityWeightsW(ctot, g, vtot);
-        m += leidenMoveW<true> (vcom, ctot, vaff, vcs, vcout, g, vcob, vtot, M, R, L, fc);
+        m += leidenMoveW<true,  RANDOM>(vcom, ctot, vaff, vcs, vcout, *rng[0], g, vcob, vtot, M, R, L, fc);
         if (s==0) copyValuesW(a, vcom);
         else      leidenLookupCommunitiesU(a, vcom);
         l += max(m, 1); ++p; ++s;
@@ -712,12 +764,13 @@ auto leidenSeq(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
       }
     });
   }, o.repeat);
+  leidenFreeRngsW(rng);
   return LeidenResult<K>(a, l, s, t, tm);
 }
 
 #ifdef OPENMP
-template <class FLAG=char, class G, class K, class FM>
-auto leidenOmp(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class FM>
+auto leidenOmp(RND& rnd, const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   using  W = LEIDEN_WEIGHT_TYPE;
   using  B = FLAG;
   double R = o.resolution;
@@ -726,6 +779,7 @@ auto leidenOmp(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   size_t S = x.span();
   double M = edgeWeightOmp(x)/2;
   int    T = omp_get_max_threads();
+  vector<xorshift32_engine*> rng(T);
   vector<K> bufk(T);
   vector<K> vcom(S), a(S);
   vector<W> vtot(S), ctot(S);
@@ -735,6 +789,7 @@ auto leidenOmp(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   vector<vector<K>*> vcs(T);
   vector<vector<W>*> vcout(T);
   leidenAllocateHashtablesW(vcs, vcout, S);
+  leidenAllocateRngsW(rng, rnd);
   float tm = 0;
   float t  = measureDurationMarked([&](auto mark) {
     double E  = o.tolerance;
@@ -753,9 +808,9 @@ auto leidenOmp(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
       for (l=0, p=0, s=0; M>0 && p<P;) {
         const G& g = s==0? x : y;
         int m = 0;
-        m += leidenMoveOmpW<false>(vcob, ctot, vaff, vcs, vcout, g, vcob, vtot, M, R, L, fc);
+        m += leidenMoveOmpW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, rng, g, vcob, vtot, M, R, L, fc);
         leidenInitializeCommunityWeightsOmpW(ctot, g, vtot);
-        m += leidenMoveOmpW<true> (vcom, ctot, vaff, vcs, vcout, g, vcob, vtot, M, R, L, fc);
+        m += leidenMoveOmpW<true,  RANDOM>(vcom, ctot, vaff, vcs, vcout, rng, g, vcob, vtot, M, R, L, fc);
         if (s==0) copyValuesW(a, vcom);
         else      leidenLookupCommunitiesOmpU(a, vcom);
         l += max(m, 1); ++p; ++s;
@@ -777,6 +832,7 @@ auto leidenOmp(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
     });
   }, o.repeat);
   leidenFreeHashtablesW(vcs, vcout);
+  leidenFreeRngsW(rng);
   return LeidenResult<K>(a, l, s, t, tm);
 }
 #endif
@@ -787,16 +843,16 @@ auto leidenOmp(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
 // LEIDEN STATIC
 // -------------
 
-template <class FLAG=char, class G, class K>
-inline auto leidenStaticSeq(const G& x, const vector<K>* q=nullptr, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K>
+inline auto leidenStaticSeq(RND& rnd, const G& x, const vector<K>* q=nullptr, const LeidenOptions& o={}) {
   auto fm = [](auto& vertices) { fillValueU(vertices, FLAG(1)); };
-  return leidenSeq<FLAG>(x, q, o, fm);
+  return leidenSeq<RANDOM, FLAG>(rnd, x, q, o, fm);
 }
 
 #ifdef OPENMP
-template <class FLAG=char, class G, class K>
-inline auto leidenStaticOmp(const G& x, const vector<K>* q=nullptr, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K>
+inline auto leidenStaticOmp(RND& rnd, const G& x, const vector<K>* q=nullptr, const LeidenOptions& o={}) {
   auto fm = [](auto& vertices) { fillValueOmpU(vertices, FLAG(1)); };
-  return leidenOmp<FLAG>(x, q, o, fm);
+  return leidenOmp<RANDOM, FLAG>(rnd, x, q, o, fm);
 }
 #endif
