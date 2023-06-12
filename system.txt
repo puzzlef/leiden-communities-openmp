@@ -1,0 +1,9 @@
+NVIDIA DGX Station A100
+Proc:  AMD EPYC 7742 64-Core CPU @ 2.25GHz (64 cores x 2)
+Cache: L1d+i: 4MB, L2: 32MB, L3: 256MB (shared), NUMA: 4 (internal)
+Mem:   512GB System Memory
+Disk:  Micron 7300 PRO 1.92TB NVMe; KIOXIA KCM6DRUL7T68 7.68TB NVMe
+Net:   Intel Ethernet Controller 10G X550T (10 Gbit/s)
+Disp:  4 x NVIDIA A100-SXM4-80GB; 12 x NVLink @ 25GBPS (Total 320GB)
+Disp:  ASPEED Graphics VGA controller; NVIDIA DGX Display (33MHz)
+OS:    Ubuntu 20.04.4 LTS (Focal Fossa, Linux 5.4.0-113-generic)
