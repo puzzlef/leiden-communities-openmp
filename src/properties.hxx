@@ -1,4 +1,9 @@
 #pragma once
+#include <vector>
+#include "_main.hxx"
+#include "bfs.hxx"
+
+using std::vector;
 
 
 
@@ -58,16 +63,66 @@ inline void degreesW(vector<K>& a, const G& x) {
 }
 
 
+/**
+ * Obtain the vertices belonging to each community.
+ * @param x original graph
+ * @param vcom community each vertex belongs to
+ * @returns vertices belonging to each community
+ */
+template <class G, class K>
+inline vector2d<K> communityVertices(const G& x, const vector<K>& vcom) {
+  size_t S = x.span();
+  vector2d<K> a(S);
+  x.forEachVertexKey([&](auto u) {
+    K c = vcom[u];
+    a[c].push_back(u);
+  });
+  return a;
+}
+
+
+/**
+ * Obtain the community ids of vertices in a graph.
+ * @param x original graph
+ * @param vcom community each vertex belongs to
+ * @returns community ids
+ */
 template <class G, class K>
 inline vector<K> communities(const G& x, const vector<K>& vcom) {
   size_t S = x.span();
-  vector<K> vcs;
+  vector<K> a;
   vector<char> cflag(S);
   x.forEachVertexKey([&](auto u) {
     K c = vcom[u];
     if (cflag[c]) return;
     cflag[c] = 1;
-    vcs.push_back(c);
+    a.push_back(c);
   });
-  return vcs;
+  return a;
+}
+
+
+/**
+ * Obtain the community ids of vertices in a graph which are disconnected.
+ * @param x original graph
+ * @param vcom community each vertex belongs to
+ * @returns community ids of disconnected communities
+ */
+template <class G, class K>
+inline vector<K> disconnectedCommunities(const G& x, const vector<K>& vcom) {
+  size_t  S = x.span();
+  vector<char> vis(S);
+  vector<K> a;
+  auto comv = communityVertices(x, vcom);
+  for (K c=0; c<S; ++c) {
+    if (comv[c].empty()) continue;
+    K u = comv[c][0];
+    size_t nvis = 0;
+    fillValueU(vis, char());
+    auto ft = [&](auto v, auto d) { return vcom[v]==c; };
+    auto fp = [&](auto v, auto d) { ++nvis; };
+    bfsVisitedForEachW(vis, x, u, ft, fp);
+    if (nvis<comv[c].size()) a.push_back(c);
+  }
+  return a;
 }

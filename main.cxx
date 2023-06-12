@@ -55,8 +55,10 @@ void runExperiment(const G& x) {
   // Follow a specific result logging format, which can be easily parsed later.
   auto flog = [&](const auto& ans, const char *technique) {
     printf(
-      "{%09.1f/%09.1fms, %04d iters, %03d passes, %01.9f modularity} %s\n",
-      ans.preprocessingTime, ans.time, ans.iterations, ans.passes, getModularity(x, ans, M), technique
+      "{%09.1f/%09.1fms, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
+      ans.preprocessingTime, ans.time, ans.iterations, ans.passes, getModularity(x, ans, M),
+      disconnectedCommunities(x, ans.membership).size(),
+      communities(x, ans.membership).size(), technique
     );
   };
   // Get community memberships on original graph (static).
