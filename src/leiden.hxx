@@ -170,7 +170,7 @@ inline void leidenCommunityWeightsOmpW(vector<W>& ctot, const G& x, const vector
  * @param x original graph
  * @param vtot total edge weight of each vertex
  */
-template <class G, class K, class W>
+template <class G, class W>
 inline void leidenInitializeCommunityWeightsW(vector<W>& ctot, const G& x, const vector<W>& vtot) {
   x.forEachVertexKey([&](auto u) {
     ctot[u] = vtot[u];
@@ -178,8 +178,9 @@ inline void leidenInitializeCommunityWeightsW(vector<W>& ctot, const G& x, const
 }
 
 #ifdef OPENMP
-template <class G, class K, class W>
+template <class G, class W>
 inline void leidenInitializeCommunityWeightsOmpW(vector<W>& ctot, const G& x, const vector<W>& vtot) {
+  using  K = typename G::key_type;
   size_t S = x.span();
   #pragma omp parallel for schedule(auto)
   for (K u=0; u<S; ++u) {
@@ -695,7 +696,6 @@ auto leidenSeq(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
         else      leidenLookupCommunitiesU(a, vcom);
         l += max(m, 1); ++p; ++s;
         if (m<=1 || p>=P) break;
-        const G& g = s<=1? x : y;
         size_t gn = g.order();
         size_t yn = leidenCountCommunityVerticesW(cn, g, vcom);
         if (double(yn)/gn >= o.aggregationTolerance) break;
