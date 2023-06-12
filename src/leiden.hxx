@@ -24,10 +24,10 @@ using std::max;
 
 
 
-// LOUVAIN OPTIONS
-// ---------------
+// LEIDEN OPTIONS
+// --------------
 
-struct LouvainOptions {
+struct LeidenOptions {
   int    repeat;
   double resolution;
   double tolerance;
@@ -36,39 +36,39 @@ struct LouvainOptions {
   int    maxIterations;
   int    maxPasses;
 
-  LouvainOptions(int repeat=1, double resolution=1, double tolerance=1e-2, double aggregationTolerance=0.8, double toleranceDecline=100, int maxIterations=20, int maxPasses=10) :
+  LeidenOptions(int repeat=1, double resolution=1, double tolerance=1e-2, double aggregationTolerance=0.8, double toleranceDecline=100, int maxIterations=20, int maxPasses=10) :
   repeat(repeat), resolution(resolution), tolerance(tolerance), aggregationTolerance(aggregationTolerance), toleranceDecline(toleranceDecline), maxIterations(maxIterations), maxPasses(maxPasses) {}
 };
 
 // Weight to be using in hashtable.
-#define LOUVAIN_WEIGHT_TYPE double
+#define LEIDEN_WEIGHT_TYPE double
 
 
 
 
-// LOUVAIN RESULT
-// --------------
+// LEIDEN RESULT
+// -------------
 
 template <class K>
-struct LouvainResult {
+struct LeidenResult {
   vector<K> membership;
   int   iterations;
   int   passes;
   float time;
   float preprocessingTime;
 
-  LouvainResult(vector<K>&& membership, int iterations=0, int passes=0, float time=0, float preprocessingTime=0) :
+  LeidenResult(vector<K>&& membership, int iterations=0, int passes=0, float time=0, float preprocessingTime=0) :
   membership(membership), iterations(iterations), passes(passes), time(time), preprocessingTime(preprocessingTime) {}
 
-  LouvainResult(vector<K>& membership, int iterations=0, int passes=0, float time=0, float preprocessingTime=0) :
+  LeidenResult(vector<K>& membership, int iterations=0, int passes=0, float time=0, float preprocessingTime=0) :
   membership(move(membership)), iterations(iterations), passes(passes), time(time), preprocessingTime(preprocessingTime) {}
 };
 
 
 
 
-// LOUVAIN HASHTABLES
-// ------------------
+// LEIDEN HASHTABLES
+// -----------------
 
 /**
  * Allocate a number of hashtables.
@@ -77,7 +77,7 @@ struct LouvainResult {
  * @param S size of each hashtable
  */
 template <class K, class W>
-inline void louvainAllocateHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, size_t S) {
+inline void leidenAllocateHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, size_t S) {
   size_t N = vcs.size();
   for (size_t i=0; i<N; ++i) {
     vcs[i]   = new vector<K>();
@@ -92,7 +92,7 @@ inline void louvainAllocateHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>
  * @param vcout total edge weight from vertex u to community C (updated)
  */
 template <class K, class W>
-inline void louvainFreeHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& vcout) {
+inline void leidenFreeHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& vcout) {
   size_t N = vcs.size();
   for (size_t i=0; i<N; ++i) {
     delete vcs[i];
@@ -103,8 +103,8 @@ inline void louvainFreeHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& 
 
 
 
-// LOUVAIN INITIALIZE
-// ------------------
+// LEIDEN INITIALIZE
+// -----------------
 
 /**
  * Find the total edge weight of each vertex.
@@ -112,7 +112,7 @@ inline void louvainFreeHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& 
  * @param x original graph
  */
 template <class G, class W>
-inline void louvainVertexWeightsW(vector<W>& vtot, const G& x) {
+inline void leidenVertexWeightsW(vector<W>& vtot, const G& x) {
   x.forEachVertexKey([&](auto u) {
     x.forEachEdge(u, [&](auto v, auto w) {
       vtot[u] += w;
@@ -122,7 +122,7 @@ inline void louvainVertexWeightsW(vector<W>& vtot, const G& x) {
 
 #ifdef OPENMP
 template <class G, class W>
-inline void louvainVertexWeightsOmpW(vector<W>& vtot, const G& x) {
+inline void leidenVertexWeightsOmpW(vector<W>& vtot, const G& x) {
   using  K = typename G::key_type;
   size_t S = x.span();
   #pragma omp parallel for schedule(auto)
@@ -142,7 +142,7 @@ inline void louvainVertexWeightsOmpW(vector<W>& vtot, const G& x) {
  * @param vtot total edge weight of each vertex
  */
 template <class G, class K, class W>
-inline void louvainCommunityWeightsW(vector<W>& ctot, const G& x, const vector<K>& vcom, const vector<W>& vtot) {
+inline void leidenCommunityWeightsW(vector<W>& ctot, const G& x, const vector<K>& vcom, const vector<W>& vtot) {
   x.forEachVertexKey([&](auto u) {
     K c = vcom[u];
     ctot[c] += vtot[u];
@@ -151,7 +151,7 @@ inline void louvainCommunityWeightsW(vector<W>& ctot, const G& x, const vector<K
 
 #ifdef OPENMP
 template <class G, class K, class W>
-inline void louvainCommunityWeightsOmpW(vector<W>& ctot, const G& x, const vector<K>& vcom, const vector<W>& vtot) {
+inline void leidenCommunityWeightsOmpW(vector<W>& ctot, const G& x, const vector<K>& vcom, const vector<W>& vtot) {
   size_t S = x.span();
   #pragma omp parallel for schedule(auto)
   for (K u=0; u<S; ++u) {
@@ -172,7 +172,7 @@ inline void louvainCommunityWeightsOmpW(vector<W>& ctot, const G& x, const vecto
  * @param vtot total edge weight of each vertex
  */
 template <class G, class K, class W>
-inline void louvainInitializeW(vector<K>& vcom, vector<W>& ctot, const G& x, const vector<W>& vtot) {
+inline void leidenInitializeW(vector<K>& vcom, vector<W>& ctot, const G& x, const vector<W>& vtot) {
   x.forEachVertexKey([&](auto u) {
     vcom[u] = u;
     ctot[u] = vtot[u];
@@ -181,7 +181,7 @@ inline void louvainInitializeW(vector<K>& vcom, vector<W>& ctot, const G& x, con
 
 #ifdef OPENMP
 template <class G, class K, class W>
-inline void louvainInitializeOmpW(vector<K>& vcom, vector<W>& ctot, const G& x, const vector<W>& vtot) {
+inline void leidenInitializeOmpW(vector<K>& vcom, vector<W>& ctot, const G& x, const vector<W>& vtot) {
   size_t S = x.span();
   #pragma omp parallel for schedule(auto)
   for (K u=0; u<S; ++u) {
@@ -203,7 +203,7 @@ inline void louvainInitializeOmpW(vector<K>& vcom, vector<W>& ctot, const G& x, 
  * @param q initial community each vertex belongs to
  */
 template <bool REFINE=false, class G, class K, class W>
-inline void louvainInitializeFromW(vector<K>& vcom, vector<K>& vcob, vector<W>& ctot, const G& x, const vector<W>& vtot, const vector<K>& q) {
+inline void leidenInitializeFromW(vector<K>& vcom, vector<K>& vcob, vector<W>& ctot, const G& x, const vector<W>& vtot, const vector<K>& q) {
   x.forEachVertexKey([&](auto u) {
     K c = q[u];
     if (REFINE) {
@@ -220,7 +220,7 @@ inline void louvainInitializeFromW(vector<K>& vcom, vector<K>& vcob, vector<W>& 
 
 #ifdef OPENMP
 template <bool REFINE=false, class G, class K, class W>
-inline void louvainInitializeFromOmpW(vector<K>& vcom, vector<K>& vcob, vector<W>& ctot, const G& x, const vector<W>& vtot, const vector<K>& q) {
+inline void leidenInitializeFromOmpW(vector<K>& vcom, vector<K>& vcob, vector<W>& ctot, const G& x, const vector<W>& vtot, const vector<K>& q) {
   size_t S = x.span();
   #pragma omp parallel for schedule(auto)
   for (K u=0; u<S; ++u) {
@@ -243,8 +243,8 @@ inline void louvainInitializeFromOmpW(vector<K>& vcom, vector<K>& vcob, vector<W
 
 
 
-// LOUVAIN COMMUNITY VERTICES
-// --------------------------
+// LEIDEN COMMUNITY VERTICES
+// -------------------------
 
 /**
  * Find the number of vertices in each community.
@@ -254,7 +254,7 @@ inline void louvainInitializeFromOmpW(vector<K>& vcom, vector<K>& vcob, vector<W
  * @returns number of communities
  */
 template <class G, class K>
-inline size_t louvainCountCommunityVerticesW(K *a, const G& x, const K *vcom) {
+inline size_t leidenCountCommunityVerticesW(K *a, const G& x, const K *vcom) {
   size_t S = x.span();
   size_t n = 0;
   fillValueU(a, S, K());
@@ -266,14 +266,14 @@ inline size_t louvainCountCommunityVerticesW(K *a, const G& x, const K *vcom) {
   return n;
 }
 template <class G, class K>
-inline size_t louvainCountCommunityVerticesW(vector<K>& a, const G& x, const vector<K>& vcom) {
-  return louvainCountCommunityVerticesW(a.data(), x, vcom.data());
+inline size_t leidenCountCommunityVerticesW(vector<K>& a, const G& x, const vector<K>& vcom) {
+  return leidenCountCommunityVerticesW(a.data(), x, vcom.data());
 }
 
 
 #ifdef OPENMP
 template <class G, class K>
-inline size_t louvainCountCommunityVerticesOmpW(K *a, const G& x, const K *vcom) {
+inline size_t leidenCountCommunityVerticesOmpW(K *a, const G& x, const K *vcom) {
   size_t S = x.span();
   size_t n = 0;
   fillValueOmpU(a, S, K());
@@ -288,8 +288,8 @@ inline size_t louvainCountCommunityVerticesOmpW(K *a, const G& x, const K *vcom)
   return n;
 }
 template <class G, class K>
-inline size_t louvainCountCommunityVerticesOmpW(vector<K>& a, const G& x, const vector<K>& vcom) {
-  return louvainCountCommunityVerticesOmpW(a.data(), x, vcom.data());
+inline size_t leidenCountCommunityVerticesOmpW(vector<K>& a, const G& x, const vector<K>& vcom) {
+  return leidenCountCommunityVerticesOmpW(a.data(), x, vcom.data());
 }
 #endif
 
@@ -305,7 +305,7 @@ inline size_t louvainCountCommunityVerticesOmpW(vector<K>& a, const G& x, const 
  * @param vcom community each vertex belongs to
  */
 template <class G, class K>
-inline void louvainCommunityVerticesW(vector<K>& co, vector<K>& ce, vector<K>& cn, const G& x, const vector<K>& vcom) {
+inline void leidenCommunityVerticesW(vector<K>& co, vector<K>& ce, vector<K>& cn, const G& x, const vector<K>& vcom) {
   size_t S = x.span();
   co[S] = exclusiveScanW(co, cn);
   fillValueU(cn, K());
@@ -319,7 +319,7 @@ inline void louvainCommunityVerticesW(vector<K>& co, vector<K>& ce, vector<K>& c
 
 #ifdef OPENMP
 template <class G, class K>
-inline void louvainCommunityVerticesOmpW(vector<K>& co, vector<K>& ce, vector<K>& cn, vector<K>& bufk, const G& x, const vector<K>& vcom) {
+inline void leidenCommunityVerticesOmpW(vector<K>& co, vector<K>& ce, vector<K>& cn, vector<K>& bufk, const G& x, const vector<K>& vcom) {
   size_t S = x.span();
   co[S] = exclusiveScanOmpW(co, bufk, cn);
   fillValueOmpU(cn, K());
@@ -337,8 +337,8 @@ inline void louvainCommunityVerticesOmpW(vector<K>& co, vector<K>& ce, vector<K>
 
 
 
-// LOUVAIN LOOKUP COMMUNITIES
-// --------------------------
+// LEIDEN LOOKUP COMMUNITIES
+// -------------------------
 
 /**
  * Update community membership in a tree-like fashion (to handle aggregation).
@@ -346,14 +346,14 @@ inline void louvainCommunityVerticesOmpW(vector<K>& co, vector<K>& ce, vector<K>
  * @param vcom community each vertex belongs to (at this aggregation level)
  */
 template <class K>
-inline void louvainLookupCommunitiesU(vector<K>& a, const vector<K>& vcom) {
+inline void leidenLookupCommunitiesU(vector<K>& a, const vector<K>& vcom) {
   for (auto& v : a)
     v = vcom[v];
 }
 
 #ifdef OPENMP
 template <class K>
-inline void louvainLookupCommunitiesOmpU(vector<K>& a, const vector<K>& vcom) {
+inline void leidenLookupCommunitiesOmpU(vector<K>& a, const vector<K>& vcom) {
   size_t S = a.size();
   #pragma omp parallel for schedule(auto)
   for (size_t u=0; u<S; ++u)
@@ -364,8 +364,8 @@ inline void louvainLookupCommunitiesOmpU(vector<K>& a, const vector<K>& vcom) {
 
 
 
-// LOUVAIN CHANGE COMMUNITY
-// ------------------------
+// LEIDEN CHANGE COMMUNITY
+// -----------------------
 
 /**
  * Scan an edge community connected to a vertex.
@@ -378,7 +378,7 @@ inline void louvainLookupCommunitiesOmpU(vector<K>& a, const vector<K>& vcom) {
  * @param vcob community bound each vertex belongs to
  */
 template <bool SELF=false, bool REFINE=false, class K, class V, class W>
-inline void louvainScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom, const vector<K>& vcob) {
+inline void leidenScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom, const vector<K>& vcob) {
   if (!SELF && u==v) return;
   if (REFINE && vcob[u]!=vcob[v]) return;
   K c = vcom[v];
@@ -386,8 +386,8 @@ inline void louvainScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V 
   vcout[c] += w;
 }
 template <bool SELF=false, class K, class V, class W>
-inline void louvainScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom) {
-  louvainScanCommunityW<SELF, false>(vcs, vcout, u, v, w, vcom, vcom);
+inline void leidenScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom) {
+  leidenScanCommunityW<SELF, false>(vcs, vcout, u, v, w, vcom, vcom);
 }
 
 
@@ -401,12 +401,12 @@ inline void louvainScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V 
  * @param vcob community bound each vertex belongs to
  */
 template <bool SELF=false, bool REFINE=false, class G, class K, class W>
-inline void louvainScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x, K u, const vector<K>& vcom, const vector<K>& vcob) {
-  x.forEachEdge(u, [&](auto v, auto w) { louvainScanCommunityW<SELF, REFINE>(vcs, vcout, u, v, w, vcom, vcob); });
+inline void leidenScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x, K u, const vector<K>& vcom, const vector<K>& vcob) {
+  x.forEachEdge(u, [&](auto v, auto w) { leidenScanCommunityW<SELF, REFINE>(vcs, vcout, u, v, w, vcom, vcob); });
 }
 template <bool SELF=false, class G, class K, class W>
-inline void louvainScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x, K u, const vector<K>& vcom) {
-  louvainScanCommunitiesW<SELF, false>(vcs, vcout, x, u, vcom, vcom);
+inline void leidenScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x, K u, const vector<K>& vcom) {
+  leidenScanCommunitiesW<SELF, false>(vcs, vcout, x, u, vcom, vcom);
 }
 
 
@@ -416,7 +416,7 @@ inline void louvainScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x
  * @param vcout communities vertex u is linked to (updated)
  */
 template <class K, class W>
-inline void louvainClearScanW(vector<K>& vcs, vector<W>& vcout) {
+inline void leidenClearScanW(vector<K>& vcs, vector<W>& vcout) {
   for (K c : vcs)
     vcout[c] = W();
   vcs.clear();
@@ -437,7 +437,7 @@ inline void louvainClearScanW(vector<K>& vcs, vector<W>& vcout) {
  * @returns [best community, delta modularity]
  */
 template <bool SELF=false, class G, class K, class W>
-inline auto louvainChooseCommunity(const G& x, K u, const vector<K>& vcom, const vector<W>& vtot, const vector<W>& ctot, const vector<K>& vcs, const vector<W>& vcout, double M, double R) {
+inline auto leidenChooseCommunity(const G& x, K u, const vector<K>& vcom, const vector<W>& vtot, const vector<W>& ctot, const vector<K>& vcs, const vector<W>& vcout, double M, double R) {
   K cmax = K(), d = vcom[u];
   W emax = W();
   for (K c : vcs) {
@@ -459,7 +459,7 @@ inline auto louvainChooseCommunity(const G& x, K u, const vector<K>& vcom, const
  * @param vtot total edge weight of each vertex
  */
 template <class G, class K, class W>
-inline void louvainChangeCommunityW(vector<K>& vcom, vector<W>& ctot, const G& x, K u, K c, const vector<W>& vtot) {
+inline void leidenChangeCommunityW(vector<K>& vcom, vector<W>& ctot, const G& x, K u, K c, const vector<W>& vtot) {
   K d = vcom[u];
   ctot[d] -= vtot[u];
   ctot[c] += vtot[u];
@@ -468,7 +468,7 @@ inline void louvainChangeCommunityW(vector<K>& vcom, vector<W>& ctot, const G& x
 
 #ifdef OPENMP
 template <class G, class K, class W>
-inline void louvainChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G& x, K u, K c, const vector<W>& vtot) {
+inline void leidenChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G& x, K u, K c, const vector<W>& vtot) {
   K d = vcom[u];
   #pragma omp atomic
   ctot[d] -= vtot[u];
@@ -481,11 +481,11 @@ inline void louvainChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G
 
 
 
-// LOUVAIN MOVE
-// ------------
+// LEIDEN MOVE
+// -----------
 
 /**
- * Louvain algorithm's local moving phase.
+ * Leiden algorithm's local moving phase.
  * @param vcom community each vertex belongs to (initial, updated)
  * @param ctot total edge weight of each community (precalculated, updated)
  * @param vaff is vertex affected flag (updated)
@@ -502,17 +502,17 @@ inline void louvainChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G
  * @returns iterations performed (0 if converged already)
  */
 template <bool REFINE=false, class G, class K, class W, class B, class FC>
-inline int louvainMoveW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<B>& vpro, vector<K>& vcs, vector<W>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
+inline int leidenMoveW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<B>& vpro, vector<K>& vcs, vector<W>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
   int l = 0;
   W  el = W();
   for (; l<L;) {
     el = W();
     x.forEachVertexKey([&](auto u) {
       if (!vaff[u]) return;
-      louvainClearScanW(vcs, vcout);
-      louvainScanCommunitiesW<false, REFINE>(vcs, vcout, x, u, vcom, vcob);
-      auto [c, e] = louvainChooseCommunity(x, u, vcom, vtot, ctot, vcs, vcout, M, R);
-      if (c)      { louvainChangeCommunityW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
+      leidenClearScanW(vcs, vcout);
+      leidenScanCommunitiesW<false, REFINE>(vcs, vcout, x, u, vcom, vcob);
+      auto [c, e] = leidenChooseCommunity(x, u, vcom, vtot, ctot, vcs, vcout, M, R);
+      if (c)      { leidenChangeCommunityW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
       if (REFINE) vpro[u] = B(1);
       vaff[u] = B();
       el += e;  // l1-norm
@@ -530,7 +530,7 @@ inline int louvainMoveW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vecto
 
 #ifdef OPENMP
 template <bool REFINE=false, class G, class K, class W, class B, class FC>
-inline int louvainMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<B>& vpro, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
+inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<B>& vpro, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
   size_t S = x.span();
   int l = 0;
   W  el = W();
@@ -541,10 +541,10 @@ inline int louvainMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, ve
       int t = omp_get_thread_num();
       if (!x.hasVertex(u)) continue;
       if (!vaff[u]) continue;
-      louvainClearScanW(*vcs[t], *vcout[t]);
-      louvainScanCommunitiesW<false, REFINE>(*vcs[t], *vcout[t], x, u, vcom, vcob);
-      auto [c, e] = louvainChooseCommunity(x, u, vcom, vtot, ctot, *vcs[t], *vcout[t], M, R);
-      if (c)      { louvainChangeCommunityOmpW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
+      leidenClearScanW(*vcs[t], *vcout[t]);
+      leidenScanCommunitiesW<false, REFINE>(*vcs[t], *vcout[t], x, u, vcom, vcob);
+      auto [c, e] = leidenChooseCommunity(x, u, vcom, vtot, ctot, *vcs[t], *vcout[t], M, R);
+      if (c)      { leidenChangeCommunityOmpW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
       if (REFINE) vpro[u] = B(1);
       vaff[u] = B();
       el += e;  // l1-norm
@@ -566,11 +566,11 @@ inline int louvainMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, ve
 
 
 
-// LOUVAIN AGGREGATE
-// -----------------
+// LEIDEN AGGREGATE
+// ----------------
 
 /**
- * Louvain algorithm's community aggregation phase.
+ * Leiden algorithm's community aggregation phase.
  * @param a output graph
  * @param vcs communities vertex u is linked to (temporary buffer, updated)
  * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
@@ -580,17 +580,17 @@ inline int louvainMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, ve
  * @param ce csr data vertices belonging to each community
  */
 template <class G, class K, class W>
-inline void louvainAggregateW(G& a, vector<K>& vcs, vector<W>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
+inline void leidenAggregateW(G& a, vector<K>& vcs, vector<W>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
   size_t S = x.span();
   a.respan(S);
   for (K c=0; c<S; ++c) {
     K oc = co[c];
     K nc = co[c+1] - co[c];
     if (nc==0) continue;
-    louvainClearScanW(vcs, vcout);
+    leidenClearScanW(vcs, vcout);
     for (K i=0; i<nc; ++i) {
       K u = ce[oc+i];
-      louvainScanCommunitiesW<true>(vcs, vcout, x, u, vcom);
+      leidenScanCommunitiesW<true>(vcs, vcout, x, u, vcom);
     }
     // a.reserveEdges(c, vcs.size());
     a.addVertex(c);
@@ -603,7 +603,7 @@ inline void louvainAggregateW(G& a, vector<K>& vcs, vector<W>& vcout, const G& x
 
 #ifdef OPENMP
 template <class G, class K, class W>
-inline void louvainAggregateOmpW(G& a, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
+inline void leidenAggregateOmpW(G& a, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
   size_t S = x.span();
   a.respan(S);
   #pragma omp parallel for schedule(auto)
@@ -612,10 +612,10 @@ inline void louvainAggregateOmpW(G& a, vector<vector<K>*>& vcs, vector<vector<W>
     K oc = co[c];
     K nc = co[c+1] - co[c];
     if (nc==0) continue;
-    louvainClearScanW(*vcs[t], *vcout[t]);
+    leidenClearScanW(*vcs[t], *vcout[t]);
     for (K i=0; i<nc; ++i) {
       K u = ce[oc+i];
-      louvainScanCommunitiesW<true>(*vcs[t], *vcout[t], x, u, vcom);
+      leidenScanCommunitiesW<true>(*vcs[t], *vcout[t], x, u, vcom);
     }
     // a.reserveEdges(c, (*vcs[t]).size());
     for (auto d : *vcs[t])
@@ -628,15 +628,15 @@ inline void louvainAggregateOmpW(G& a, vector<vector<K>*>& vcs, vector<vector<W>
 
 
 template <class G, class K, class W>
-inline auto louvainAggregate(vector<K>& vcs, vector<W>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
-  G a; louvainAggregateW(a, vcs, vcout, x, vcom, co, ce);
+inline auto leidenAggregate(vector<K>& vcs, vector<W>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
+  G a; leidenAggregateW(a, vcs, vcout, x, vcom, co, ce);
   return a;
 }
 
 #ifdef OPENMP
 template <class G, class K, class W>
-inline auto louvainAggregateOmp(vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
-  G a; louvainAggregateOmpW(a, vcs, vcout, x, vcom, co, ce);
+inline auto leidenAggregateOmp(vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcom, const vector<K>& co, const vector<K>& ce) {
+  G a; leidenAggregateOmpW(a, vcs, vcout, x, vcom, co, ce);
   return a;
 }
 #endif
@@ -644,19 +644,19 @@ inline auto louvainAggregateOmp(vector<vector<K>*>& vcs, vector<vector<W>*>& vco
 
 
 
-// LOUVAIN
-// -------
+// LEIDEN
+// ------
 
 /**
  * Find the community each vertex belongs to.
  * @param x original graph
  * @param q initial community each vertex belongs to
- * @param o louvain options
+ * @param o leiden options
  * @param fm marking affected vertices / preprocessing to be performed (vaff)
  * @returns community each vertex belongs to
  */
 template <bool JUMP=false, bool REFINE=false, class FLAG=char, class G, class K, class FM>
-auto louvainSeq(const G& x, const vector<K> *q, const LouvainOptions& o, FM fm) {
+auto leidenSeq(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   using  W = LOUVAIN_WEIGHT_TYPE;
   using  B = FLAG;
   double R = o.resolution;
@@ -688,39 +688,39 @@ auto louvainSeq(const G& x, const vector<K> *q, const LouvainOptions& o, FM fm) 
     fillValueU(a, K());
     mark([&]() {
       tm = measureDuration([&]() { fm(vaff); });
-      louvainVertexWeightsW(vtot, x);
-      if (q) louvainInitializeFromW<REFINE>(vcom, vcob, ctot, x, vtot, *q);
-      else   louvainInitializeW(vcom, ctot, x, vtot);
+      leidenVertexWeightsW(vtot, x);
+      if (q) leidenInitializeFromW<REFINE>(vcom, vcob, ctot, x, vtot, *q);
+      else   leidenInitializeW(vcom, ctot, x, vtot);
       for (l=0, p=0, s=0; M>0 && p<P;) {
         int m = 0;
-        if (s==0) m = louvainMoveW<REFINE>(vcom, ctot, vaff, vpro, vcs, vcout, x, vcob, vtot, M, R, L, fc);
-        else      m = louvainMoveW<false> (vcom, ctot, vaff, vpro, vcs, vcout, y, vcob, vtot, M, R, L, fc);
+        if (s==0) m = leidenMoveW<REFINE>(vcom, ctot, vaff, vpro, vcs, vcout, x, vcob, vtot, M, R, L, fc);
+        else      m = leidenMoveW<false> (vcom, ctot, vaff, vpro, vcs, vcout, y, vcob, vtot, M, R, L, fc);
         if (s==0) copyValuesW(a, vcom);
-        else      louvainLookupCommunitiesU(a, vcom);
+        else      leidenLookupCommunitiesU(a, vcom);
         l += max(m, 1); ++p; ++s;
         if (m<=1 || p>=P) break;
         const G& g = s<=1? x : y;
         size_t gn = g.order();
-        size_t yn = louvainCountCommunityVerticesW(cn, g, vcom);
+        size_t yn = leidenCountCommunityVerticesW(cn, g, vcom);
         if (double(yn)/gn >= o.aggregationTolerance) break;
-        louvainCommunityVerticesW(co, ce, cn, g, vcom);
-        y = louvainAggregate(vcs, vcout, g, vcom, co, ce);
+        leidenCommunityVerticesW(co, ce, cn, g, vcom);
+        y = leidenAggregate(vcs, vcout, g, vcom, co, ce);
         fillValueU(vcom, K());
         fillValueU(vtot, W());
         fillValueU(ctot, W());
         fillValueU(vaff, B(1));
-        louvainVertexWeightsW(vtot, y);
-        louvainInitializeW(vcom, ctot, y, vtot);
+        leidenVertexWeightsW(vtot, y);
+        leidenInitializeW(vcom, ctot, y, vtot);
         E /= o.toleranceDecline;
       }
     });
   }, o.repeat);
-  return LouvainResult<K>(a, l, s, t, tm);
+  return LeidenResult<K>(a, l, s, t, tm);
 }
 
 #ifdef OPENMP
 template <bool JUMP=false, bool REFINE=false, class FLAG=char, class G, class K, class FM>
-auto louvainOmp(const G& x, const vector<K> *q, const LouvainOptions& o, FM fm) {
+auto leidenOmp(const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   using  W = LOUVAIN_WEIGHT_TYPE;
   using  B = FLAG;
   double R = o.resolution;
@@ -737,7 +737,7 @@ auto louvainOmp(const G& x, const vector<K> *q, const LouvainOptions& o, FM fm) 
   vector<K>& vcob = a;
   vector<vector<K>*> vcs(T);
   vector<vector<W>*> vcout(T);
-  louvainAllocateHashtablesW(vcs, vcout, S);
+  leidenAllocateHashtablesW(vcs, vcout, S);
   float tm = 0;
   float t  = measureDurationMarked([&](auto mark) {
     double E  = o.tolerance;
@@ -757,54 +757,54 @@ auto louvainOmp(const G& x, const vector<K> *q, const LouvainOptions& o, FM fm) 
     fillValueOmpU(a, K());
     mark([&]() {
       tm = measureDuration([&]() { fm(vaff); });
-      louvainVertexWeightsOmpW(vtot, x);
-      if (q) louvainInitializeFromOmpW<REFINE>(vcom, vcob, ctot, x, vtot, *q);
-      else   louvainInitializeOmpW(vcom, ctot, x, vtot);
+      leidenVertexWeightsOmpW(vtot, x);
+      if (q) leidenInitializeFromOmpW<REFINE>(vcom, vcob, ctot, x, vtot, *q);
+      else   leidenInitializeOmpW(vcom, ctot, x, vtot);
       for (l=0, p=0, s=0; M>0 && p<P;) {
         int m = 0;
-        if (s==0) m = louvainMoveOmpW<REFINE>(vcom, ctot, vaff, vpro, vcs, vcout, x, vcob, vtot, M, R, L, fc);
-        else      m = louvainMoveOmpW<false> (vcom, ctot, vaff, vpro, vcs, vcout, y, vcob, vtot, M, R, L, fc);
+        if (s==0) m = leidenMoveOmpW<REFINE>(vcom, ctot, vaff, vpro, vcs, vcout, x, vcob, vtot, M, R, L, fc);
+        else      m = leidenMoveOmpW<false> (vcom, ctot, vaff, vpro, vcs, vcout, y, vcob, vtot, M, R, L, fc);
         if (s==0) copyValuesW(a, vcom);
-        else      louvainLookupCommunitiesOmpU(a, vcom);
+        else      leidenLookupCommunitiesOmpU(a, vcom);
         l += max(m, 1); ++p; ++s;
         if (m<=1 || p>=P) break;
         const G& g = s<=1? x : y;
         size_t gn = g.order();
-        size_t yn = louvainCountCommunityVerticesOmpW(cn, g, vcom);
+        size_t yn = leidenCountCommunityVerticesOmpW(cn, g, vcom);
         if (double(yn)/gn >= o.aggregationTolerance) break;
-        louvainCommunityVerticesOmpW(co, ce, cn, bufk, g, vcom);
-        y = louvainAggregateOmp(vcs, vcout, g, vcom, co, ce);
+        leidenCommunityVerticesOmpW(co, ce, cn, bufk, g, vcom);
+        y = leidenAggregateOmp(vcs, vcout, g, vcom, co, ce);
         fillValueOmpU(vcom, K());
         fillValueOmpU(vtot, W());
         fillValueOmpU(ctot, W());
         fillValueOmpU(vaff, B(1));
-        louvainVertexWeightsOmpW(vtot, y);
-        louvainInitializeOmpW(vcom, ctot, y, vtot);
+        leidenVertexWeightsOmpW(vtot, y);
+        leidenInitializeOmpW(vcom, ctot, y, vtot);
         E /= o.toleranceDecline;
       }
     });
   }, o.repeat);
-  louvainFreeHashtablesW(vcs, vcout);
-  return LouvainResult<K>(a, l, s, t, tm);
+  leidenFreeHashtablesW(vcs, vcout);
+  return LeidenResult<K>(a, l, s, t, tm);
 }
 #endif
 
 
 
 
-// LOUVAIN STATIC
-// --------------
+// LEIDEN STATIC
+// -------------
 
 template <bool JUMP=false, bool REFINE=false, class FLAG=char, class G, class K>
-inline auto louvainStaticSeq(const G& x, const vector<K>* q=nullptr, const LouvainOptions& o={}) {
+inline auto leidenStaticSeq(const G& x, const vector<K>* q=nullptr, const LeidenOptions& o={}) {
   auto fm = [](auto& vertices) { fillValueU(vertices, FLAG(1)); };
-  return louvainSeq<JUMP, REFINE, FLAG>(x, q, o, fm);
+  return leidenSeq<JUMP, REFINE, FLAG>(x, q, o, fm);
 }
 
 #ifdef OPENMP
 template <bool JUMP=false, bool REFINE=false, class FLAG=char, class G, class K>
-inline auto louvainStaticOmp(const G& x, const vector<K>* q=nullptr, const LouvainOptions& o={}) {
+inline auto leidenStaticOmp(const G& x, const vector<K>* q=nullptr, const LeidenOptions& o={}) {
   auto fm = [](auto& vertices) { fillValueOmpU(vertices, FLAG(1)); };
-  return louvainOmp<JUMP, REFINE, FLAG>(x, q, o, fm);
+  return leidenOmp<JUMP, REFINE, FLAG>(x, q, o, fm);
 }
 #endif
