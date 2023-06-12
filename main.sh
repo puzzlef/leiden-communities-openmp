@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-src="louvain-communities-openmp-dynamic"
+src="leiden-communities-openmp"
 out="$HOME/Logs/$src$1.log"
 ulimit -s unlimited
 printf "" > "$out"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-src="louvain-communities-openmp-dynamic"
+src="leiden-communities-openmp"
 ulimit -s unlimited
 
 # Download program
