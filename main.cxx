@@ -1,11 +1,11 @@
-#include <cstdint>
-#include <cstdio>
 #include <utility>
 #include <random>
 #include <vector>
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <cstdint>
+#include <cstdio>
 #include "src/main.hxx"
 
 using namespace std;
@@ -48,25 +48,29 @@ void runExperiment(const G& x) {
   using V = typename G::edge_value_type;
   random_device dev;
   default_random_engine rnd(dev());
-  int repeat  = REPEAT_METHOD;
+  int repeat  = 1;  // REPEAT_METHOD;
   int retries = 5;
   vector<K> *init = nullptr;
   double M = edgeWeightOmp(x)/2;
+  LOG("M = %f\n", M);
   // Follow a specific result logging format, which can be easily parsed later.
   auto flog = [&](const auto& ans, const char *technique) {
     printf(
       "{%09.1f/%09.1fms, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
       ans.preprocessingTime, ans.time, ans.iterations, ans.passes, getModularity(x, ans, M),
-      disconnectedCommunities(x, ans.membership).size(),
+      disconnectedCommunitiesDfsOmp(x, ans.membership).size(),
       communities(x, ans.membership).size(), technique
     );
   };
   // Get community memberships on original graph (static).
   auto a0 = louvainStaticOmp(x, init, {repeat});
+  LOG("louvainStaticOmp()\n");
   flog(a0, "louvainStaticOmp");
   auto b0 = leidenStaticOmp<false>(rnd, x, init, {repeat});
+  LOG("leidenStaticOmpGreedy()\n");
   flog(b0, "leidenStaticOmpGreedy");
   auto b1 = leidenStaticOmp<true> (rnd, x, init, {repeat});
+  LOG("leidenStaticOmpRandom()\n");
   flog(b1, "leidenStaticOmpRandom");
 }
 

@@ -2,6 +2,7 @@
 #include <vector>
 #include "_main.hxx"
 #include "bfs.hxx"
+#include "dfs.hxx"
 
 using std::vector;
 
@@ -37,6 +38,7 @@ inline double edgeWeight(const G& x) {
   return a;
 }
 
+#ifdef OPENMP
 template <class G>
 inline double edgeWeightOmp(const G& x) {
   using K = typename G::key_type;
@@ -49,6 +51,7 @@ inline double edgeWeightOmp(const G& x) {
   }
   return a;
 }
+#endif
 
 
 /**
@@ -79,6 +82,23 @@ inline vector2d<K> communityVertices(const G& x, const vector<K>& vcom) {
   });
   return a;
 }
+
+#ifdef OPENMP
+template <class G, class K>
+inline vector2d<K> communityVerticesOmp(const G& x, const vector<K>& vcom) {
+  size_t S = x.span();
+  vector2d<K> a(S);
+  #pragma omp parallel
+  {
+    for (K u=0; u<S; ++u) {
+      if (!x.hasVertex(u)) continue;
+      K c = vcom[u];
+      if (belongsOmp(c)) a[c].push_back(u);
+    }
+  }
+  return a;
+}
+#endif
 
 
 /**
@@ -114,6 +134,7 @@ inline vector<K> disconnectedCommunities(const G& x, const vector<K>& vcom) {
   vector<char> vis(S);
   vector<K> a;
   auto comv = communityVertices(x, vcom);
+  LOG("disconnectedCommunities(): communityVertices() done\n");
   for (K c=0; c<S; ++c) {
     if (comv[c].empty()) continue;
     K u = comv[c][0];
@@ -125,4 +146,55 @@ inline vector<K> disconnectedCommunities(const G& x, const vector<K>& vcom) {
     if (nvis<comv[c].size()) a.push_back(c);
   }
   return a;
+}
+
+#ifdef OPENMP
+template <class G, class K>
+inline vector<K> disconnectedCommunitiesOmp(const G& x, const vector<K>& vcom) {
+  size_t  S = x.span();
+  int     T = omp_get_max_threads();
+  vector2d<char> vis(T, vector<char>(S));
+  vector2d<K> a(T);
+  auto comv = communityVerticesOmp(x, vcom);
+  #pragma omp parallel for schedule(auto)
+  for (K c=0; c<S; ++c) {
+    int t = omp_get_thread_num();
+    if (comv[c].empty()) continue;
+    K u = comv[c][0];
+    size_t nvis = 0;
+    fillValueU(vis[t], char());
+    auto ft = [&](auto v, auto d) { return vcom[v]==c; };
+    auto fp = [&](auto v, auto d) { ++nvis; };
+    bfsVisitedForEachW(vis[t], x, u, ft, fp);
+    if (nvis<comv[c].size()) a[t].push_back(c);
+  }
+  for (int t=1; t<T; ++t)
+    a[0].insert(a[0].end(), a[t].begin(), a[t].end());
+  return a[0];
+}
+#endif
+
+
+template <class G, class K>
+inline vector<K> disconnectedCommunitiesDfsOmp(const G& x, const vector<K>& vcom) {
+  size_t  S = x.span();
+  int     T = omp_get_max_threads();
+  vector2d<char> vis(T, vector<char>(S));
+  vector2d<K> a(T);
+  auto comv = communityVerticesOmp(x, vcom);
+  #pragma omp parallel for schedule(auto)
+  for (K c=0; c<S; ++c) {
+    int t = omp_get_thread_num();
+    if (comv[c].empty()) continue;
+    K u = comv[c][0];
+    size_t nvis = 0;
+    fillValueU(vis[t], char());
+    auto ft = [&](auto v) { return vcom[v]==c; };
+    auto fp = [&](auto v) { ++nvis; };
+    dfsVisitedForEachW(vis[t], x, u, ft, fp);
+    if (nvis<comv[c].size()) a[t].push_back(c);
+  }
+  for (int t=1; t<T; ++t)
+    a[0].insert(a[0].end(), a[t].begin(), a[t].end());
+  return a[0];
 }

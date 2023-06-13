@@ -12,6 +12,7 @@ if [[ "$DOWNLOAD" != "0" ]]; then
 fi
 
 # Fixed config
+export OMP_STACKSIZE="4G"
 : "${TYPE:=float}"
 : "${MAX_THREADS:=64}"
 : "${REPEAT_METHOD:=5}"

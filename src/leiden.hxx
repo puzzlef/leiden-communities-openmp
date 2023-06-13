@@ -814,12 +814,14 @@ auto leidenOmp(RND& rnd, const G& x, const vector<K> *q, const LeidenOptions& o,
         if (s==0) copyValuesW(a, vcom);
         else      leidenLookupCommunitiesOmpU(a, vcom);
         l += max(m, 1); ++p; ++s;
+        LOG("leidenOmp(): l=%d p=%d; local-moving phase done\n", l, p);
         if (m<=1 || p>=P) break;
         size_t gn = g.order();
         size_t yn = leidenCountCommunityVerticesOmpW(cn, g, vcom);
         if (double(yn)/gn >= o.aggregationTolerance) break;
         leidenCommunityVerticesOmpW(co, ce, cn, bufk, g, vcom);
         y = leidenAggregateOmp(vcs, vcout, g, vcom, co, ce);
+        LOG("leidenOmp(): l=%d p=%d; aggregation phase done\n", l, p);
         fillValueOmpU(vcob, K());
         fillValueOmpU(vcom, K());
         fillValueOmpU(vtot, W());
