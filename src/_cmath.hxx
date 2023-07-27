@@ -11,55 +11,84 @@ using std::sqrt;
 
 
 
-// CEIL DIV
-// --------
-// For kernel launch calculation.
-
+#pragma region METHODS
+#pragma region CEIL DIV
+/**
+ * Calculate ceil(x/y).
+ * @param x the dividend
+ * @param y the divisor
+ * @returns ceil(x/y)
+ */
 template <class T>
 inline T ceilDiv(T x, T y) {
+  // For kernel launch calculation.
   if (is_floating_point<T>::value) return ceil(x/y);
   return (x + y-1) / y;
 }
+#pragma endregion
 
 
 
 
-// SGN
-// ---
-// https://stackoverflow.com/a/4609795/1413259
-
+#pragma region SGN
+/**
+ * Get the sign of a value.
+ * @param x the value
+ * @returns -1 if x<0, 0 if x==0, 1 if x>0
+ */
 template <typename T>
 inline int sgn(T x) {
   return (T() < x) - (x < T());
 }
+// - https://stackoverflow.com/a/4609795/1413259
+#pragma endregion
 
 
 
 
-// POW2
-// ----
-
+#pragma region POW2
+/**
+ * Check if a value is a power of 2.
+ * @param x the value
+ * @returns true if x is a power of 2
+ */
 template <class T>
 constexpr bool isPow2(T x) noexcept {
   return !(x & (x-1));
 }
 
+
+/**
+ * Get the previous power of 2 of a value.
+ * @param x the value
+ * @returns previous power of 2 of x
+ */
 template <class T>
 constexpr T prevPow2(T x) noexcept {
   return 1 << T(log2(x));
 }
 
+
+/**
+ * Get the next power of 2 of a value.
+ * @param x the value
+ * @returns next power of 2 of x
+ */
 template <class T>
 constexpr T nextPow2(T x) noexcept {
   return 1 << T(ceil(log2(x)));
 }
+#pragma endregion
 
 
 
 
-// PRIME
-// -----
-
+#pragma region PRIME
+/**
+ * Examine if a value is prime.
+ * @param x the value
+ * @returns true if x is prime
+ */
 template <class T>
 inline bool isPrime(T x) {
   // 1. 2, 3 are prime
@@ -72,12 +101,25 @@ inline bool isPrime(T x) {
   return true;
 }
 
+
+/**
+ * Obtain the next prime of a value.
+ * @param x the value
+ * @returns next prime of x
+ */
 template <class T>
 inline T nextPrime(T x) {
   while (true)
     if (isPrime(++x)) return x;
 }
 
+
+/**
+ * Obtain a random prime number in a range.
+ * @param begin beginning of the range
+ * @param end end of the range
+ * @param rnd random number generator
+ */
 template <class T, class R>
 inline T randomPrime(T begin, T end, R& rnd) {
   uniform_int_distribution<T> dis(begin, end);
@@ -87,3 +129,5 @@ inline T randomPrime(T begin, T end, R& rnd) {
   }
   return end-1;
 }
+#pragma endregion
+#pragma endregion

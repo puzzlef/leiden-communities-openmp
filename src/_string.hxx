@@ -7,11 +7,13 @@ using std::string;
 
 
 
-// COUNT LINES
-// -----------
-// For counting temporal edges.
-
-size_t countLines(const char* x) {
+#pragma region METHODS
+/**
+ * Count the number of lines in a string.
+ * @param x string
+ * @returns number of lines
+ */
+inline size_t countLines(const char* x) {
   ASSERT(x);
   size_t a = 1;
   for (; *x; x++) {
@@ -20,6 +22,14 @@ size_t countLines(const char* x) {
   }
   return a;
 }
+
+
+/**
+ * Count the number of lines in a string.
+ * @param x string
+ * @returns number of lines
+ */
 inline size_t countLines(const string& x) {
   return countLines(x.c_str());
 }
+#pragma endregion

@@ -13,41 +13,90 @@ using std::chrono::duration_cast;
 
 
 
-// PAIR
-// ----
-
+#pragma region FUNCTORS
+#pragma region PAIR ACCESSORS
+/**
+ * Accessor for the first element (key) of a pair.
+ * @tparam K key type
+ * @tparam V value type
+ */
 template <class K, class V>
 struct PairFirst  { inline K& operator()(pair<K, V>& x) noexcept { return x.first; } };
+
+/**
+ * Accessor for the second element (value) of a pair.
+ * @tparam K key type
+ * @tparam V value type
+ */
 template <class K, class V>
 struct PairSecond { inline V& operator()(pair<K, V>& x) noexcept { return x.second; } };
+
+/**
+ * Read-only accessor for the first element (key) of a pair.
+ * @tparam K key type
+ * @tparam V value type
+ */
 template <class K, class V>
 struct ConstPairFirst  { inline const K& operator()(const pair<K, V>& x) noexcept { return x.first; } };
+
+/**
+ * Read-only accessor for the second element (value) of a pair.
+ * @tparam K key type
+ * @tparam V value type
+ */
 template <class K, class V>
 struct ConstPairSecond { inline const V& operator()(const pair<K, V>& x) noexcept { return x.second; } };
+
+/**
+ * Value accessor for the first element (key) of a pair.
+ * @tparam K key type
+ * @tparam V value type
+ */
 template <class K, class V>
 struct PairFirstValue  { inline K operator()(const pair<K, V>& x) noexcept { return x.first; } };
+
+/**
+ * Value accessor for the second element (value) of a pair.
+ * @tparam K key type
+ * @tparam V value type
+ */
 template <class K, class V>
 struct PairSecondValue { inline V operator()(const pair<K, V>& x) noexcept { return x.second; } };
+#pragma endregion
+#pragma endregion
 
 
 
 
-// MEASURE DURATION
-// ----------------
-
-/** Get current time. */
+#pragma region METHODS
+#pragma region MEASURE DURATION
+/**
+ * Get current time.
+ * @returns high resolution clock time
+ */
 inline auto timeNow() {
   return high_resolution_clock::now();
 }
 
-/** Get time duration in milliseconds. */
+
+/**
+ * Get time duration.
+ * @param start start time
+ * @param stop stop time
+ * @returns time duration in milliseconds
+ */
 template <class T>
 inline float duration(const T& start, const T& stop) {
   auto a = duration_cast<microseconds>(stop - start);
   return a.count()/1000.0f;
 }
 
-/** Get time duration in milliseconds. */
+
+/**
+ * Get time duration to now.
+ * @param start start time
+ * @returns time duration in milliseconds
+ */
 template <class T>
 inline float duration(const T& start) {
   auto stop = timeNow();
@@ -55,6 +104,14 @@ inline float duration(const T& start) {
 }
 
 
+
+
+/**
+ * Measure the duration of execution of a function.
+ * @param fn measured function
+ * @param N number of times to repeat the measurement
+ * @returns average duration in milliseconds
+ */
 template <class F>
 inline float measureDuration(F fn, int N=1) {
   auto start = timeNow();
@@ -64,7 +121,14 @@ inline float measureDuration(F fn, int N=1) {
   return duration(start, stop)/N;
 }
 
+
 #ifdef MPI
+/**
+ * Measure the duration of execution of a function.
+ * @param fn measured function
+ * @param N number of times to repeat the measurement
+ * @returns average duration in milliseconds
+ */
 template <class F>
 inline float measureDurationMpi(F fn, int N=1) {
   double total = 0;
@@ -84,6 +148,12 @@ inline float measureDurationMpi(F fn, int N=1) {
 #endif
 
 
+/**
+ * Measure the duration of execution of marked sections in a function.
+ * @param fn measured function (section marker)
+ * @param N number of times to repeat the measurement
+ * @returns average duration in milliseconds
+ */
 template <class F>
 inline float measureDurationMarked(F fn, int N=1) {
   float total = 0;
@@ -92,7 +162,14 @@ inline float measureDurationMarked(F fn, int N=1) {
   return total/N;
 }
 
+
 #ifdef MPI
+/**
+ * Measure the duration of execution of marked sections in a function.
+ * @param fn measured function (section marker)
+ * @param N number of times to repeat the measurement
+ * @returns average duration in milliseconds
+ */
 template <class F>
 inline float measureDurationMarkedMpi(F fn, int N=1) {
   float total = 0;
@@ -101,32 +178,58 @@ inline float measureDurationMarkedMpi(F fn, int N=1) {
   return total/N;
 }
 #endif
+#pragma endregion
 
 
 
 
-// RETRY
-// -----
-
+#pragma region RETRY
+/**
+ * Call a function, retrying if it fails.
+ * @param fn called function (returns true if successful)
+ * @param N number of tries
+ * @returns true if successful
+ */
 template <class F>
 inline bool retry(F fn, int N=2) {
   for (int i=0; i<N; ++i)
     if (fn()) return true;
   return false;
 }
+#pragma endregion
 
 
 
 
-// MOVE
-// ----
-// Conditional move, otherwise value.
-
+#pragma region MOVE
+/**
+ * Conditional move.
+ * @param c condition
+ * @param t true value
+ * @param f false value
+ * @returns move(t) if c, otherwise f
+ */
 #define CMOVE(c, t, f) \
   ((c)? move(t) : (f))
 
+
+/**
+ * Conditional move vector.
+ * @param t true vector
+ * @param f false vector
+ * @returns move(t) if t is not empty, otherwise f
+ */
 #define CMOVE_VECTOR(t, f) \
   CMOVE(!(t).empty(), t, f)
 
+
+/**
+ * Conditional move graph.
+ * @param t true graph
+ * @param f false graph
+ * @returns move(t) if t is not empty, otherwise f
+ */
 #define CMOVE_GRAPH(t, f) \
   CMOVE((t).order()>0, t, f)
+#pragma endregion
+#pragma endregion

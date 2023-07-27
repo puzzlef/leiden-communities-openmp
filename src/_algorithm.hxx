@@ -1,57 +1,23 @@
 #pragma once
-#include <iterator>
-#include <algorithm>
-#include <vector>
+// Avoid compiler error/bug "error: structured binding refers to incomplete type"
 #include <unordered_map>
+#include <algorithm>
 #include "_queue.hxx"
 
-using std::iterator_traits;
-using std::vector;
-using std::unordered_map;
-using std::all_of;
-using std::count_if;
-using std::equal;
 using std::copy;
-using std::sort;
 
 
 
 
-// FIRST
-// -----
-// First position.
-
-template <class I>
-inline auto first_value(I ib, I ie) {
-  using T = typename iterator_traits<I>::value_type;
-  T a = ib != ie? *ib : T();
-  return a;
-}
-template <class J>
-inline auto firstValue(const J& x) {
-  return first_value(x.begin(), x.end());
-}
-
-
-
-
-// ALL OF
-// ------
-// Is everything there?
-
-template <class J, class F>
-inline bool allOf(const J& x, F fn) {
-  return all_of(x.begin(), x.end(), fn);
-}
-
-
-
-
-// ADJACENT FIND
-// -------------
-
+/**
+ * Find the first element that does not match its adjacent element.
+ * @param ib begin iterator
+ * @param ie end iterator
+ * @param fe equality function (a, b)
+ * @returns iterator to the first non-adjacent element
+ */
 template <class I, class FE>
-auto non_adjacent_find(I ib, I ie, FE fe) {
+inline I non_adjacent_find(I ib, I ie, FE fe) {
   if (ib==ie) return ie;
   // Compare adjacent elements, and if they
   // dont match, return the first one.
@@ -63,150 +29,48 @@ auto non_adjacent_find(I ib, I ie, FE fe) {
 }
 
 
-
-
-// EQUAL
-// -----
-// Check if values match.
-
-template <class IX, class IY>
-inline bool equal_values(IX xb, IX xe, IY yb) {
-  return equal(xb, xe, yb);
-}
-template <class IX, class IY>
-inline bool equal_values(IX xb, IX xe, IY yb, IY ye) {
-  return equal(xb, xe, yb, ye);
-}
-template <class IX, class IY, class FE>
-inline bool equal_values(IX xb, IX xe, IY yb, FE fe) {
-  return equal(xb, xe, yb, fe);
-}
-template <class IX, class IY, class FE>
-inline bool equal_values(IX xb, IX xe, IY yb, IY ye, FE fe) {
-  return equal(xb, xe, yb, ye, fe);
-}
-template <class JX, class JY>
-inline bool equalValues(const JX& x, const JY& y) {
-  return equal_values(x.begin(), x.end(), y.begin(), y.end());
-}
-template <class JX, class JY, class FE>
-inline bool equalValues(const JX& x, const JY& y, FE fe) {
-  return equal_values(x.begin(), x.end(), y.begin(), y.end(), fe);
-}
-
-
-
-
-// COUNT
-// -----
-// Count businesses in a sector.
-
-template <class J, class F>
-inline size_t countIf(const J& x, F fn) {
-  return count_if(x.begin(), x.end(), fn);
-}
-
-
-
-
-// COPY
-// ----
-
-template <class I, class IA>
-inline auto copy_values(I ib, I ie, IA ab) {
-  return copy(ib, ie, ab);
-}
-template <class J, class JA>
-inline size_t copyValues(const J& x, JA& a) {
-  auto   it = copy_values(x.begin(), x.end(), a.begin());
-  return it - a.begin();
-}
-
-
-template <class I, class T>
-inline auto copy_append(I ib, I ie, vector<T>& a) {
-  return a.insert(a.end(), ib, ie);
-}
-template <class J, class T>
-inline size_t copyAppend(const J& x, vector<T>& a) {
-  auto   it = copy_append(x.begin(), x.end(), a);
-  return it - a.begin();
-}
-
-
+/**
+ * Find the first element that does not match its adjacent element.
+ * @param ib begin iterator
+ * @param ie end iterator
+ * @returns iterator to the first non-adjacent element
+ */
 template <class I>
-inline auto copy_vector(I ib, I ie) {
-  using T = typename iterator_traits<I>::value_type; vector<T> a;
-  copy_append(ib, ie, a);
-  return a;
-}
-template <class J>
-inline auto copyVector(const J& x) {
-  return copy_vector(x.begin(), x.end());
+inline auto non_adjacent_find(I ib, I ie) {
+  auto fe = [](const auto& a, const auto& b) { return a == b; };
+  return non_adjacent_find(ib, ie, fe);
 }
 
 
 
 
-// VALUE INDEX
-// -----------
-// Keep the address of each business (yellow pages).
-
+/**
+ * Obtain the index of each element in a container.
+ * @param ib begin iterator
+ * @param ie end iterator
+ * @param a map to store the index of each element (updated)
+ */
 template <class I, class M>
-auto value_index(I ib, I ie, M& a) {
+inline void value_index(I ib, I ie, M& a) {
   size_t i = 0;
   for (; ib != ie; ++ib)
     a[*ib] = i++;
   return a;
 }
-template <class J, class M>
-inline auto valueIndex(const J& x, M& a) {
-  return value_index(x.begin(), x.end(), a);
-}
-
-template <class I>
-inline auto value_index_unordered_map(I ib, I ie) {
-  using K = typename iterator_traits<I>::value_type;
-  unordered_map<K, size_t> a;
-  return value_index(ib, ie, a);
-}
-template <class J>
-inline auto valueIndexUnorderedMap(const J& x) {
-  return value_index_unordered_map(x.begin(), x.end());
-}
 
 
 
 
-// SORT
-// ----
-// Arrange your portfolio by ROCE.
-
-template <class I>
-inline void sort_values(I ib, I ie) {
-  sort(ib, ie);
-}
-template <class I, class FL>
-inline void sort_values(I ib, I ie, FL fl) {
-  sort(ib, ie, fl);
-}
-template <class J>
-inline void sortValues(J& x) {
-  sort_values(x.begin(), x.end());
-}
-template <class J, class FL>
-inline void sortValues(J& x, FL fl) {
-  sort_values(x.begin(), x.end(), fl);
-}
-
-
-
-
-// UNIQUE
-// ------
-
+/**
+ * Keep only the last unique element in a container.
+ * @param xb begin iterator of input (updated)
+ * @param xe end iterator of input (updated)
+ * @param ab begin iterator of output
+ * @param fe equality function (a, b)
+ * @returns iterator to the end of output
+ */
 template <class IX, class IA, class FE>
-auto unique_last_copy(IX xb, IX xe, IA ab, FE fe) {
+inline IA unique_last_copy(IX xb, IX xe, IA ab, FE fe) {
   if (xb==xe) return ab;
   // Compare adjacent elements, and
   // only copy non-matching ones.
@@ -217,8 +81,17 @@ auto unique_last_copy(IX xb, IX xe, IA ab, FE fe) {
   *(ab++) = *it;
   return ab;
 }
+
+
+/**
+ * Keep only the last unique element in a container.
+ * @param xb begin iterator of input (updated)
+ * @param xe end iterator of input (updated)
+ * @param ab begin iterator of output
+ * @returns iterator to the end of output
+ */
 template <class IX, class IA>
-inline auto unique_last_copy(IX xb, IX xe, IA ab) {
+inline IA unique_last_copy(IX xb, IX xe, IA ab) {
   auto fe = [](const auto& a, const auto& b) { return a == b; };
   return unique_last_copy(xb, xe, ab, fe);
 }
@@ -226,13 +99,20 @@ inline auto unique_last_copy(IX xb, IX xe, IA ab) {
 
 
 
-// SET DIFFERENCE
-// --------------
-
-// Remove from `x`, elements given in `y`.
-// Both `x` and `y` must be sorted.
+/**
+ * Keep elements in a container that are not in another container (in-place).
+ * @param xb begin iterator of input (updated)
+ * @param xe end iterator of input (updated)
+ * @param yb begin iterator of elements to remove
+ * @param ye end iterator of elements to remove
+ * @param fl less-than function (a, b)
+ * @param fe equality function (a, b)
+ * @returns iterator to the end of updated input
+ */
 template <class IX, class IY, class FL, class FE>
-auto set_difference_inplace(IX xb, IX xe, IY yb, IY ye, FL fl, FE fe) {
+inline IX set_difference_inplace(IX xb, IX xe, IY yb, IY ye, FL fl, FE fe) {
+  // Remove from `x`, elements given in `y`.
+  // Both `x` and `y` must be sorted.
   if (xb==xe || yb==ye) return xe;
   // Write-free loop when there is
   // nothing to remove.
@@ -260,34 +140,42 @@ auto set_difference_inplace(IX xb, IX xe, IY yb, IY ye, FL fl, FE fe) {
   // Shift the remaining elements.
   return copy(xb, xe, it);
 }
+
+
+/**
+ * Keep elements in a container that are not in another container (in-place).
+ * @param xb begin iterator of input (updated)
+ * @param xe end iterator of input (updated)
+ * @param yb begin iterator of elements to remove
+ * @param ye end iterator of elements to remove
+ * @returns iterator to the end of updated input
+ */
 template <class IX, class IY>
-inline auto set_difference_inplace(IX xb, IX xe, IY yb, IY ye) {
+inline IX set_difference_inplace(IX xb, IX xe, IY yb, IY ye) {
   auto fl = [](const auto& a, const auto& b) { return a <  b; };
   auto fe = [](const auto& a, const auto& b) { return a == b; };
   return set_difference_inplace(xb, xe, yb, ye, fl, fe);
 }
 
-template <class JX, class JY, class FL, class FE>
-inline size_t setDifferenceInplace(JX& x, const JY& y, FL fl, FE fe) {
-  auto   it = set_difference_inplace(x.begin(), x.end(), y.begin(), y.end(), fl, fe);
-  return it - x.begin();
-}
-template <class JX, class JY>
-inline size_t setDifferenceInplace(JX& x, const JY& y) {
-  auto   it = set_difference_inplace(x.begin(), x.end(), y.begin(), y.end());
-  return it - x.begin();
-}
 
 
 
-
-// SET UNION
-// ---------
-
-// Add elements from `y` into `x`, preferring the last in `y` among matching elements.
-// Both `x` and `y` must be sorted. There must be sufficient space in `x` and `b` (buffer = |y|+2+1).
+/**
+ * Find the set union of two containers, keeping the last element among matching ones (in-place).
+ * @param xb begin iterator of input (updated)
+ * @param xe end iterator of input (updated)
+ * @param yb begin iterator of elements to add
+ * @param ye end iterator of elements to add
+ * @param bb begin iterator of buffer, of size |y|+2+1
+ * @param be end iterator of buffer
+ * @param fl less-than function (a, b)
+ * @param fe equality function (a, b)
+ * @returns iterator to the end of updated input
+ */
 template <class IX, class IY, class IB, class FL, class FE>
-auto set_union_last_inplace(IX xb, IX xe, IY yb, IY ye, IB bb, IB be, FL fl, FE fe) {
+inline IX set_union_last_inplace(IX xb, IX xe, IY yb, IY ye, IB bb, IB be, FL fl, FE fe) {
+  // Add elements from `y` into `x`, preferring the last in `y` among matching elements.
+  // Both `x` and `y` must be sorted. There must be sufficient space in `x` and `b` (buffer = |y|+2+1).
   if (yb==ye) return xe;
   if (xb==xe) return unique_last_copy(yb, ye, xb);
   // Deque-free loop when there
@@ -323,20 +211,21 @@ auto set_union_last_inplace(IX xb, IX xe, IY yb, IY ye, IB bb, IB be, FL fl, FE 
   }
   return ++it;
 }
+
+
+/**
+ * Find the set union of two containers, keeping the last element among matching ones (in-place).
+ * @param xb begin iterator of input (updated)
+ * @param xe end iterator of input (updated)
+ * @param yb begin iterator of elements to add
+ * @param ye end iterator of elements to add
+ * @param bb begin iterator of buffer
+ * @param be end iterator of buffer
+ * @returns iterator to the end of updated input
+ */
 template <class IX, class IY, class IB>
 inline auto set_union_last_inplace(IX xb, IX xe, IY yb, IY ye, IB bb, IB be) {
   auto fl = [](const auto& a, const auto& b) { return a <  b; };
   auto fe = [](const auto& a, const auto& b) { return a == b; };
   return set_union_last_inplace(xb, xe, yb, ye, bb, be, fl, fe);
-}
-
-template <class JX, class JY, class JB, class FL, class FE>
-inline size_t setUnionLastInplace(JX& x, const JY& y, JB& b, FL fl, FE fe) {
-  auto   it = set_union_last_inplace(x.begin(), x.end(), y.begin(), y.end(), b.begin(), b.end(), fl, fe);
-  return it - x.begin();
-}
-template <class JX, class JY, class JB>
-inline size_t setUnionLastInplace(JX& x, const JY& y, JB& b) {
-  auto   it = set_union_last_inplace(x.begin(), x.end(), y.begin(), y.end(), b.begin(), b.end());
-  return it - x.begin();
 }
