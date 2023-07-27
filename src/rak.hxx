@@ -1,8 +1,8 @@
 #pragma once
 #include <utility>
+#include <tuple>
 #include <vector>
 #include "_main.hxx"
-#include "update.hxx"
 #ifdef OPENMP
 #include <omp.h>
 #endif
@@ -24,7 +24,7 @@ using std::get;
  */
 struct RakOptions {
   #pragma region DATA
-  /** Number of times to repeat the algorithm. */
+  /** Number of times to repeat the algorithm [1]. */
   int repeat;
   /** Tolerance for convergence [0.05]. */
   double tolerance;
@@ -36,7 +36,7 @@ struct RakOptions {
   #pragma region CONSTRUCTORS
   /**
    * Define options for RAK algorithm.
-   * @param repeat number of times to repeat the algorithm
+   * @param repeat number of times to repeat the algorithm [1]
    * @param tolerance tolerance for convergence [0.05]
    * @param maxIterations maximum number of iterations [20]
    */
@@ -53,7 +53,7 @@ struct RakOptions {
 
 /**
  * Result of RAK algorithm.
- * @tparam K type of vertex-id
+ * @tparam K key type (vertex-id)
  */
 template <class K>
 struct RakResult {
@@ -498,6 +498,8 @@ inline void rakAffectedVerticesFrontierOmp(vector<B>& vertices, const G& x, cons
   }
 }
 #endif
+
+
 
 
 /**
