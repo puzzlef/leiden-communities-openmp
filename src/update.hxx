@@ -1,8 +1,7 @@
 #pragma once
-#include <cstdint>
 #include <utility>
 #include <vector>
-
+#include <cstdint>
 #ifdef OPENMP
 #include <omp.h>
 #endif
@@ -13,10 +12,16 @@ using std::vector;
 
 
 
-// ADD VERTICES IF
-// ---------------
-// Add a range of vertices.
-
+#pragma region METHODS
+#pragma region ADD VERTICES
+/**
+ * Add a range of vertices to a graph.
+ * @param a graph to add vertices to
+ * @param u begin vertex
+ * @param U end vertex (excluding)
+ * @param d vertex value
+ * @param ft test function to determine if vertex should be added (vertex, vertex value)
+ */
 template <class G, class K, class V, class FT>
 inline void addVerticesIfU(G& a, K u, K U, V d, FT ft) {
   if (U<=1) return;
@@ -25,20 +30,31 @@ inline void addVerticesIfU(G& a, K u, K U, V d, FT ft) {
     if (ft(u, d)) a.addVertex(u, d);
 }
 
-
+/**
+ * Add a range of vertices to a graph.
+ * @param a graph to add vertices to
+ * @param u begin vertex
+ * @param U end vertex (excluding)
+ * @param d vertex value
+ */
 template <class G, class K, class V=typename G::vertex_value_type>
 inline void addVerticesU(G& a, K u, K U, V d=V()) {
   auto ft = [](auto u, auto d) { return true; };
   addVerticesIfU(a, u, U, d, ft);
 }
+#pragma endregion
 
 
 
 
-// ADD EDGE
-// --------
-// Add an edge (in parallel).
-
+#pragma region ADD EDGE
+/**
+ * Add an edge to a graph.
+ * @param a graph to add edge to
+ * @param u source vertex
+ * @param v destination vertex
+ * @param w edge weight
+ */
 template <class G, class K, class E=typename G::edge_value_type>
 inline void addEdgeU(G& a, K u, K v, E w=E()) {
   a.addEdge(u, v, w);
@@ -46,40 +62,59 @@ inline void addEdgeU(G& a, K u, K v, E w=E()) {
 
 
 #ifdef OPENMP
+/**
+ * Add an edge to a graph in parallel.
+ * @param a graph to add edge to
+ * @param u source vertex
+ * @param v destination vertex
+ * @param w edge weight
+ */
 template <class G, class K, class E=typename G::edge_value_type>
 inline void addEdgeOmpU(G& a, K u, K v, E w=E()) {
   auto ft = [](K u) { return belongsOmp(u); };
   a.addEdgeIf(u, v, w, ft);
 }
 #endif
+#pragma endregion
 
 
 
 
-// REMOVE EDGE
-// -----------
-// Remove an edge (in parallel).
-
+#pragma region REMOVE EDGE
+/**
+ * Remove an edge from a graph.
+ * @param a graph to remove edge from
+ * @param u source vertex
+ * @param v destination vertex
+ */
 template <class G, class K>
 inline void removeEdgeU(G& a, K u, K v) {
   a.removeEdge(u, v);
 }
 
 #ifdef OPENMP
+/**
+ * Remove an edge from a graph in parallel.
+ * @param a graph to remove edge from
+ * @param u source vertex
+ * @param v destination vertex
+ */
 template <class G, class K>
 inline void removeEdgeOmpU(G& a, K u, K v) {
   auto ft = [](K u) { return belongsOmp(u); };
   a.removeEdgeIf(u, v, ft);
 }
 #endif
+#pragma endregion
 
 
 
 
-// UPDATE
-// ------
-// Update changes made to a graph.
-
+#pragma region UPDATE
+/**
+ * Update changes made to a graph.
+ * @param a graph to update
+ */
 template <class G>
 inline void updateU(G& a) {
   a.update();
@@ -87,6 +122,10 @@ inline void updateU(G& a) {
 
 
 #ifdef OPENMP
+/**
+ * Update changes made to a graph in parallel.
+ * @param a graph to update
+ */
 template <class G>
 inline void updateOmpU(G& a) {
   using  K = typename G::key_type;
@@ -110,3 +149,5 @@ inline void updateOmpU(G& a) {
     delete bufs[i];
 }
 #endif
+#pragma endregion
+#pragma endregion

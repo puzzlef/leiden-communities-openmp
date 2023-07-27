@@ -4,67 +4,79 @@
 
 
 
-// HAS SELF-LOOP
-// -------------
-
-template <class G, class K>
-inline bool hasSelfLoop(const G& x, K u) {
-  return x.hasEdge(u, u);
-}
-
-
-
-
-// SELF-LOOPS
-// ----------
-
-template <class G, class F>
-inline void selfLoopForEach(const G& x, F fn) {
-  x.forEachVertexKey([&](auto u) { if (hasSelfLoop(x, u)) fn(u); });
-}
+#pragma region METHODS
+#pragma region COUNT SELF-LOOPS
+/**
+ * Count the number of self-loops in a graph.
+ * @param x input graph
+ * @returns number of self-loops
+ */
 template <class G>
-inline auto selfLoops(const G& x) {
-  using K = typename G::key_type; vector<K> a;
-  selfLoopForEach(x, [&](auto u) { a.push_back(u); });
+inline size_t countSelfLoops(const G& x) {
+  size_t a = 0;
+  x.forEachVertexKey([&](auto u) { if (x.hasEdge(u, u)) ++a; });
   return a;
 }
-template <class G>
-inline auto selfLoopCount(const G& x) {
-  using K = typename G::key_type; K a = 0;
-  selfLoopForEach(x, [&](auto u) { ++a; });
-  return a;
-}
+#pragma endregion
 
 
 
 
-// SELF-LOOP
-// ---------
-
+#pragma region ADD SELF-LOOPS
+/**
+ * Add self-loops to a graph.
+ * @param a graph to add self-loops to (updated)
+ * @param w edge weight of self-loops
+ * @param ft test function to determine if self-loop should be added (vertex)
+ */
 template <class G, class E, class FT>
-inline void selfLoopU(G& a, E w, FT ft) {
+inline void addSelfLoopsU(G& a, E w, FT ft) {
   a.forEachVertexKey([&](auto u) { if (ft(u)) a.addEdge(u, u, w); });
   a.update();
 }
+
+/**
+ * Add self-loops to a graph.
+ * @param a input graph
+ * @param w edge weight of self-loops
+ * @param ft test function to determine if self-loop should be added (vertex)
+ * @returns graph with self-loops added
+ */
 template <class G, class E, class FT>
-inline auto selfLoop(const G& x, E w, FT ft) {
-  G a = x; selfLoopU(a, w, ft);
+inline G addSelfLoops(const G& x, E w, FT ft) {
+  G a = x; addSelfLoopsU(a, w, ft);
   return a;
 }
 
 
 #ifdef OPENMP
+/**
+ * Add self-loops to a graph in parallel.
+ * @param a graph to add self-loops to (updated)
+ * @param w edge weight of self-loops
+ * @param ft test function to determine if self-loop should be added (vertex)
+ */
 template <class G, class E, class FT>
-inline void selfLoopOmpU(G& a, E w, FT ft) {
+inline void addSelfLoopsOmpU(G& a, E w, FT ft) {
   #pragma omp parallel
   {
     a.forEachVertexKey([&](auto u) { if (ft(u)) addEdgeOmpU(a, u, u, w); });
   }
   updateOmpU(a);
 }
+
+/**
+ * Add self-loops to a graph in parallel.
+ * @param a input graph
+ * @param w edge weight of self-loops
+ * @param ft test function to determine if self-loop should be added (vertex)
+ * @returns graph with self-loops added
+ */
 template <class G, class E, class FT>
-inline auto selfLoopOmp(const G& x, E w, FT ft) {
-  G a = x; selfLoopOmpU(a, w, ft);
+inline G addSelfLoopsOmp(const G& x, E w, FT ft) {
+  G a = x; addSelfLoopsOmpU(a, w, ft);
   return a;
 }
 #endif
+#pragma endregion
+#pragma endregion

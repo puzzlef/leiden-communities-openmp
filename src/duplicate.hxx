@@ -4,14 +4,12 @@
 
 
 
-// DUPLICATE IF
-// ------------
-// Duplicate vertices/edges of graph if test passes.
-
+#pragma region METHODS
+#pragma region DUPLICATE IF
 /**
- * Duplicate vertices/edges of graph if test passes.
+ * Duplicate vertices/edges of a graph if test passes.
  * @param a output graph (updated)
- * @param x original graph
+ * @param x input graph
  * @param fv include vertex? (u, d)
  * @param fe include edge? (u, v, w)
  */
@@ -24,6 +22,14 @@ inline void duplicateIfW(H& a, const G& x, FV fv, FE fe) {
   });
   a.update();
 }
+
+/**
+ * Duplicate vertices/edges of a graph if test passes.
+ * @param x a graph
+ * @param fv include vertex? (u, d)
+ * @param fe include edge? (u, v, w)
+ * @returns duplicate of graph
+ */
 template <class G, class FV, class FE>
 inline G duplicateIf(const G& x, FV fv, FE fe) {
   G a; duplicateIfW(a, x, fv, fe);
@@ -33,9 +39,9 @@ inline G duplicateIf(const G& x, FV fv, FE fe) {
 
 #ifdef OPENMP
 /**
- * Duplicate vertices/edges of graph if test passes.
+ * Duplicate vertices/edges of a graph if test passes.
  * @param a output graph (updated)
- * @param x original graph
+ * @param x input graph
  * @param fv include vertex? (u, d)
  * @param fe include edge? (u, v, w)
  */
@@ -51,24 +57,30 @@ inline void duplicateIfOmpW(H& a, const G& x, FV fv, FE fe) {
   }
   updateOmpU(a);
 }
+
+/**
+ * Duplicate vertices/edges of a graph if test passes.
+ * @param x a graph
+ * @param fv include vertex? (u, d)
+ * @param fe include edge? (u, v, w)
+ * @returns duplicate of graph
+ */
 template <class G, class FV, class FE>
 inline G duplicateIfOmp(const G& x, FV fv, FE fe) {
   G a; duplicateIfOmpW(a, x, fv, fe);
   return a;
 }
 #endif
+#pragma endregion
 
 
 
 
-// DUPLICATE
-// ---------
-// Duplicate vertices/edges of graph (unconditonal love).
-
+#pragma region DUPLICATE
 /**
- * Duplicate vertices/edges of graph.
+ * Duplicate vertices/edges of a graph.
  * @param a output graph (updated)
- * @param x original graph
+ * @param x input graph
  */
 template <class H, class G>
 inline void duplicateW(H& a, const G& x) {
@@ -76,8 +88,16 @@ inline void duplicateW(H& a, const G& x) {
   auto fe = [](auto u, auto v, auto w) { return true; };
   duplicateIfW(a, x, fv, fe);
 }
+
+/**
+ * Duplicate a graph.
+ * @param x a graph
+ * @returns duplicate of graph
+ */
 template <class G>
 inline G duplicate(const G& x) {
   G a = x;  // Just use the copy constructor.
   return a;
 }
+#pragma endregion
+#pragma endregion
