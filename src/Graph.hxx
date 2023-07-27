@@ -1,713 +1,658 @@
 #pragma once
-#include <cstdint>
 #include <utility>
 #include <vector>
 #include <ostream>
-#include <iostream>
+#include <algorithm>
 #include "_main.hxx"
 
 using std::pair;
 using std::vector;
 using std::ostream;
-using std::cout;
+using std::max;
 
 
 
 
-// HELPER MACROS
-// -------------
-// Helps create graphs.
-
-#ifndef GRAPH_TYPES
-#define GRAPH_TYPES(K, V, E) \
-  using key_type = K; \
-  using vertex_key_type   = K; \
-  using vertex_value_type = V; \
-  using vertex_pair_type  = pair<K, V>; \
-  using edge_key_type     = K; \
-  using edge_value_type   = E; \
-  using edge_pair_type    = pair<K, E>;
-#endif
-
-
-#ifndef GRAPH_SIZE
-#define GRAPH_SIZE(K, V, E, N, M, vexists)  \
-  inline size_t span()  const noexcept { return vexists.size(); } \
-  inline size_t order() const noexcept { return N; } \
-  inline size_t size()  const noexcept { return M; } \
-  inline bool   empty() const noexcept { return N==0; }
-#endif
-
-
-#ifndef GRAPH_DIRECTED
-#define GRAPH_DIRECTED(K, V, E, de) \
-  inline bool directed() const noexcept { return de; }
-#endif
-
-
-#ifndef GRAPH_VERTICES
-#define GRAPH_VERTICES(K, V, E, vexists, vvalues) \
-  inline auto vertexKeys() const noexcept { \
-    auto vkeys = rangeIterable(span()); \
-    return conditionalIterable(vkeys, vexists); \
-  } \
-  inline auto vertexValues() const noexcept { \
-    return conditionalIterable(vvalues, vexists); \
-  } \
-  inline auto vertices() const noexcept { \
-    auto vkeys = rangeIterable(span()); \
-    auto pairs = pairIterable(vkeys, vvalues); \
-    return conditionalIterable(pairs, vexists); \
-  }
-
-#define GRAPH_EDGES(K, V, E, eto, enone) \
-  inline auto edgeKeys(K u) const noexcept { \
-    return u<span()? eto[u].keys()   : enone.keys(); \
-  } \
-  inline auto edgeValues(K u) const noexcept { \
-    return u<span()? eto[u].values() : enone.values(); \
-  } \
-  inline auto edges(K u) const noexcept { \
-    return u<span()? eto[u].entries()  : enone.entries(); \
-  }
-
-#define GRAPH_EDGE_AT(K, V, E, eto, enone) \
-  inline auto edgeKeyAt(K u, K i) const noexcept { \
-    return u<span()? eto[u].keyAt(i)   : enone.keyAt(i); \
-  } \
-  inline auto edgeValueAt(K u, K i) const noexcept { \
-    return u<span()? eto[u].valueAt(i) : enone.valueAt(i); \
-  } \
-  inline auto edgeAt(K u, K i) const noexcept { \
-    return u<span()? eto[u].entryAt(i) : enone.entryAt(i); \
-  }
-
-#define GRAPH_INEDGES(K, V, E, efrom, enone) \
-  inline auto inEdgeKeys(K v) const noexcept { \
-    return v<span()? efrom[v].keys()   : enone.keys(); \
-  } \
-  inline auto inEdgeValues(K v) const noexcept { \
-    return v<span()? efrom[v].values() : enone.values(); \
-  } \
-  inline auto inEdges(K v) const noexcept { \
-    return v<span()? efrom[v].entries()  : enone.entries(); \
-  }
-
-#define GRAPH_INEDGES_SCAN(K, V, E, eto) \
-  inline auto inEdgeKeys(K v) const noexcept { \
-    auto vkeys = rangeIterable(span()); \
-    auto fedge = [&](K u) { return eto[u].has(v); }; \
-    return filterIterable(vkeys, fedge); \
-  } \
-  inline auto inEdgeValues(K v) const noexcept { \
-    auto fvals = [&](K u) { return eto[u].get(v); }; \
-    return transformIterable(inEdgeKeys(v), fvals); \
-  } \
-  inline auto inEdges(K v) const noexcept { \
-    return pairIterable(inEdgeKeys(v), inEdgeValues(v)); \
-  }
-
-#define GRAPH_INEDGES_COPY(K, V, E) \
-  inline auto inEdgeKeys(K v)   const noexcept { return edgeKeys(v); } \
-  inline auto inEdgeValues(K v) const noexcept { return edgeValues(v); } \
-  inline auto inEdges(K v)      const noexcept { return edges(v); }
-#endif
-
-
-#ifndef GRAPH_FOREACH_VERTEX
-#define GRAPH_FOREACH_VERTEX(K, V, E, vexists, vvalues) \
-  template <class F> \
-  inline void forEachVertexKey(F fn) const noexcept { \
-    for (K u=0; u<span(); ++u) \
-      if (vexists[u]) fn(u); \
-  } \
-  template <class F> \
-  inline void forEachVertexValue(F fn) const noexcept { \
-    for (K u=0; u<span(); ++u) \
-      if (vexists[u]) fn(vvalues[u]); \
-  } \
-  template <class F> \
-  inline void forEachVertex(F fn) const noexcept { \
-    for (K u=0; u<span(); ++u) \
-      if (vexists[u]) fn(u, vvalues[u]); \
-  }
-
-#define GRAPH_FOREACH_XEDGE(K, V, E, name, eto, u, fn) \
-  template <class F> \
-  inline void forEach##name##Key(K u, F fn) const noexcept { \
-    if (u<span()) eto[u].forEachKey(fn); \
-  } \
-  template <class F> \
-  inline void forEach##name##Value(K u, F fn) const noexcept { \
-    if (u<span()) eto[u].forEachValue(fn); \
-  } \
-  template <class F> \
-  inline void forEach##name(K u, F fn) const noexcept { \
-    if (u<span()) eto[u].forEach(fn); \
-  }
-
-#define GRAPH_FOREACH_EDGE(K, V, E, eto) \
-  GRAPH_FOREACH_XEDGE(K, V, E, Edge,   eto,   u, fn)
-#define GRAPH_FOREACH_INEDGE(K, V, E, efrom) \
-  GRAPH_FOREACH_XEDGE(K, V, E, InEdge, efrom, v, fn)
-
-#define GRAPH_FOREACH_INEDGE_SCAN(K, V, E, eto) \
-  template <class F> \
-  inline void forEachInEdgeKey(K v, F fn) const noexcept { \
-    for (K u=0; u<span(); ++u) \
-      if (eto[u].has(v)) fn(u); \
-  } \
-  template <class F> \
-  inline void forEachInEdgeValue(K v, F fn) const noexcept { \
-    for (K u=0; u<span(); ++u) \
-      if (eto[u].has(v)) fn(eto[u].get(v)); \
-  } \
-  template <class F> \
-  inline void forEachInEdge(K v, F fn) const noexcept { \
-    for (K u=0; u<span(); ++u) \
-      if (eto[u].has(v)) fn(u, eto[u].get(v)); \
-  }
-
-#define GRAPH_FOREACH_INEDGE_COPY(K, V, E) \
-  template <class F> \
-  inline void forEachInEdgeKey(K u, F fn)   const noexcept { forEachEdgeKey(u, fn); } \
-  template <class F> \
-  inline void forEachInEdgeValue(K u, F fn) const noexcept { forEachEdgeValue(u, fn); } \
-  template <class F> \
-  inline void forEachInEdge(K u, F fn)      const noexcept { forEachEdge(u, fn); }
-#endif
-
-
-#ifndef GRAPH_HAS
-#define GRAPH_HAS(K, V, E, vexists, eto) \
-  inline bool hasVertex(K u) const noexcept { \
-    return u<span() && vexists[u]; \
-  } \
-  inline bool hasEdge(K u, K v) const noexcept { \
-    return u<span() && eto[u].has(v); \
-  }
-#endif
-
-
-#ifndef GRAPH_DEGREES
-#define GRAPH_XDEGREE(K, V, E, name, eto) \
-  inline K name(K u) const noexcept { \
-    return u<span()? K(eto[u].size()) : 0; \
-  }
-
-#define GRAPH_INDEGREE_SCAN(K, V, E, eto) \
-  inline K inDegree(K v) const noexcept { \
-    auto fedge = [&](K u) { return eto[u].has(v); }; \
-    return countIf(rangeIterable(span()), fedge); \
-  }
-
-#define GRAPH_DEGREES(K, V, E, eto, efrom) \
-  GRAPH_XDEGREE(K, V, E, degree, eto) \
-  GRAPH_XDEGREE(K, V, E, inDegree, efrom)
-#define GRAPH_DEGREES_SCAN(K, V, E, eto) \
-  GRAPH_XDEGREE(K, V, E, degree, eto) \
-  GRAPH_INDEGREE_SCAN(K, V, E, eto)
-#endif
-
-
-#ifndef GRAPH_VALUES
-#define GRAPH_VERTEX_VALUE(K, V, E, vvalues) \
-  inline V vertexValue(K u) const noexcept { \
-    return u<span()? vvalues[u] : V(); \
-  }
-
-#define GRAPH_EDGE_VALUE(K, V, E, eto) \
-  inline E edgeValue(K u, K v) const noexcept { \
-    return u<span()? eto[u].get(v) : E(); \
-  }
-
-#define GRAPH_VALUES(K, V, E, vvalues, eto) \
-  GRAPH_VERTEX_VALUE(K, V, E, vvalues) \
-  GRAPH_EDGE_VALUE(K, V, E, eto)
-
-#define GRAPH_SET_VERTEX_VALUE(K, V, E, vvalues) \
-  inline void setVertexValue(K u, V d) noexcept { \
-    if (!hasVertex(u)) return; \
-    vvalues[u] = d; \
-  }
-
-#define GRAPH_SET_EDGE_VALUE_X(K, V, E, u, v, w, ft, e0, e1) \
-  template <class FT> \
-  inline void setEdgeValue(K u, K v, E w, FT ft) noexcept { \
-    if (!hasVertex(u) || !hasVertex(v)) return; \
-    e0; \
-    e1; \
-  } \
-  inline void setEdgeValue(K u, K v, E w) noexcept { \
-    auto ft = [](K u) { return true; }; \
-    setEdgeValue(u, v, w, ft); \
-  }
-
-#define GRAPH_SET_VALUES(K, V, E, vvalues, eto, efrom) \
-  GRAPH_SET_VERTEX_VALUE(K, V, E, vvalues) \
-  GRAPH_SET_EDGE_VALUE_X(K, V, E, u, v, w, ft, if (ft(u)) eto[u].set(v, w), if (ft(v)) efrom[v].set(u, w))
-
-#define GRAPH_SET_VALUES_SCAN(K, V, E, vvalues, eto) \
-  GRAPH_SET_VERTEX_VALUE(K, V, E, vvalues) \
-  GRAPH_SET_EDGE_VALUE_X(K, V, E, u, v, w, ft, if (ft(u)) eto[u].set(v, w), false)
-#endif
-
-
-#ifndef GRAPH_RESERVE
-#define GRAPH_RESERVE_EDGES_X(K, V, E, u, deg, e0, e1) \
-  inline void reserveEdges(K u, size_t deg) { \
-    e0; \
-    e1; \
-  }
-
-#define GRAPH_RESERVE_EDGES(K, V, E, eto, efrom) \
-  GRAPH_RESERVE_EDGES_X(K, V, E, u, deg, eto[u].reserve(deg), efrom[u].reserve(deg))
-#define GRAPH_RESERVE_EDGES_SCAN(K, V, E, eto) \
-  GRAPH_RESERVE_EDGES_X(K, V, E, u, deg, eto[u].reserve(deg), false)
-
-#define GRAPH_RESERVE_X(K, V, E, vexists, vvalues, n, deg, e0, e1) \
-  inline void reserve(size_t n, size_t deg=0) { \
-    vexists.resize(max(n, span())); \
-    vvalues.resize(max(n, span())); \
-    e0; \
-    e1; \
-    if (deg==0) return; \
-    for (K u=0; u<span(); ++u) \
-      reserveEdges(u, deg); \
-  }
-
-#define GRAPH_RESERVE(K, V, E, vexists, vvalues, eto, efrom) \
-  GRAPH_RESERVE_X(K, V, E, vexists, vvalues, n, deg, eto.resize(max(n, span())), efrom.resize(max(n, span())))
-#define GRAPH_RESERVE_SCAN(K, V, E, vexists, vvalues, eto) \
-  GRAPH_RESERVE_X(K, V, E, vexists, vvalues, n, deg, eto.resize(max(n, span())), false)
-#endif
-
-
-#ifndef GRAPH_UPDATE
-#define GRAPH_UPDATE_EDGES_X(K, V, E, u, buf, e0, e1) \
-  inline void updateEdges(K u, vector<pair<K, E>> *buf=nullptr) { \
-    e0; \
-    e1; \
-  }
-
-#define GRAPH_UPDATE_EDGES(K, V, E, eto, efrom) \
-  GRAPH_UPDATE_EDGES_X(K, V, E, u, buf, eto[u].update(buf), efrom[u].update(buf))
-#define GRAPH_UPDATE_EDGES_SCAN(K, V, E, eto) \
-  GRAPH_UPDATE_EDGES_X(K, V, E, u, buf, eto[u].update(buf), false)
-
-#define GRAPH_UPDATE(K, V, E, N, M) \
-  inline void update() { \
-    N = 0; M = 0; \
-    vector<pair<K, E>> buf; \
-    forEachVertexKey([&](K u) { \
-      updateEdges(u, &buf); \
-      M += degree(u); ++N; \
-    }); \
-  }
-#endif
-
-
-#ifndef GRAPH_RESPAN
-#define GRAPH_RESPAN_X(K, V, E, vexists, vvalues, n, e0, e1) \
-  inline void respan(size_t n) { \
-    vexists.resize(n); \
-    vvalues.resize(n); \
-    e0; \
-    e1; \
-  }
-
-#define GRAPH_RESPAN(K, V, E, vexists, vvalues, eto, efrom) \
-  GRAPH_RESPAN_X(K, V, E, vexists, vvalues, n, eto.resize(n), efrom.resize(n))
-#define GRAPH_RESPAN_SCAN(K, V, E, vexists, vvalues, eto) \
-  GRAPH_RESPAN_X(K, V, E, vexists, vvalues, n, eto.resize(n), false)
-#endif
-
-
-#ifndef GRAPH_CLEAR
-#define GRAPH_CLEAR_X(K, V, E, N, M, vexists, vvalues, e0, e1) \
-  inline void clear() noexcept { \
-    N = 0; M = 0; \
-    vexists.clear(); \
-    vvalues.clear(); \
-    e0; \
-    e1; \
-  }
-
-#define GRAPH_CLEAR(K, V, E, N, M, vexists, vvalues, eto, efrom) \
-  GRAPH_CLEAR_X(K, V, E, N, M, vexists, vvalues, eto.clear(), efrom.clear())
-#define GRAPH_CLEAR_SCAN(K, V, E, N, M, vexists, vvalues, eto) \
-  GRAPH_CLEAR_X(K, V, E, N, M, vexists, vvalues, eto.clear(), false)
-#endif
-
-
-#ifndef GRAPH_ADD_VERTEX
-#define GRAPH_ADD_VERTEX(K, V, E, vexists, vvalues) \
-  inline void addVertex(K u, V d=V()) { \
-    if (hasVertex(u)) return; \
-    if (u>=span()) respan(u+1); \
-    vexists[u] = true; \
-    vvalues[u] = d; \
-  }
-#endif
-
-
-#ifndef GRAPH_ADD_EDGE
-#define GRAPH_ADD_EDGE_X(K, V, E, u, v, w, ft, e0, e1) \
-  template <class FT> \
-  inline void addEdge(K u, K v, E w, FT ft) { \
-    addVertex(u); addVertex(v); \
-    e0; \
-    e1; \
-  } \
-  inline void addEdge(K u, K v, E w=E()) { \
-    auto ft = [](K u) { return true; }; \
-    addEdge(u, v, w, ft); \
-  }
-
-#define GRAPH_ADD_EDGE(K, V, E, eto, efrom) \
-  GRAPH_ADD_EDGE_X(K, V, E, u, v, w, ft, if (ft(u)) eto[u].add(v, w), if (ft(v)) efrom[v].add(u, w))
-#define GRAPH_ADD_EDGE_SCAN(K, V, E, eto) \
-  GRAPH_ADD_EDGE_X(K, V, E, u, v, w, ft, if (ft(u)) eto[u].add(v, w), false)
-#endif
-
-
-#ifndef GRAPH_REMOVE_EDGE
-#define GRAPH_REMOVE_EDGE_X(K, V, E, u, v, ft, e0, e1) \
-  template <class FT> \
-  inline void removeEdge(K u, K v, FT ft) { \
-    if (!hasVertex(u) || !hasVertex(v)) return; \
-    e0; \
-    e1; \
-  } \
-  inline void removeEdge(K u, K v) { \
-    auto ft = [](K u) { return true; }; \
-    removeEdge(u, v, ft); \
-  }
-
-#define GRAPH_REMOVE_EDGE(K, V, E, eto, efrom) \
-  GRAPH_REMOVE_EDGE_X(K, V, E, u, v, ft, if (ft(u)) eto[u].remove(v), if (ft(v)) efrom[v].remove(u))
-#define GRAPH_REMOVE_EDGE_SCAN(K, V, E, eto) \
-  GRAPH_REMOVE_EDGE_X(K, V, E, u, v, ft, if (ft(u)) eto[u].remove(v), false)
-#endif
-
-
-#ifndef GRAPH_REMOVE_EDGES
-#define GRAPH_REMOVE_EDGES(K, V, E, eto, efrom) \
-  template <class FT> \
-  inline void removeEdges(K u, FT ft) { \
-    if (!hasVertex(u)) return; \
-    eto[u].forEachKey([&](K v) { if (ft(v)) efrom[v].remove(u); }); \
-    if (ft(u)) eto[u].clear(); \
-  } \
-  inline void removeEdges(K u) { \
-    auto ft = [](K u) { return true; }; \
-    removeEdges(u, ft); \
-  }
-
-#define GRAPH_REMOVE_EDGES_SCAN(K, V, E, eto) \
-  template <class FT> \
-  inline void removeEdges(K u, FT ft) { \
-    if (!hasVertex(u)) return; \
-    if (ft(u)) eto[u].clear(); \
-  } \
-  inline void removeEdges(K u) { \
-    auto ft = [](K u) { return true; }; \
-    removeEdges(u, ft); \
-  }
-#endif
-
-
-#ifndef GRAPH_REMOVE_INEDGES
-#define GRAPH_REMOVE_INEDGES(K, V, E, eto, efrom) \
-  template <class FT> \
-  inline void removeInEdges(K v, FT ft) { \
-    if (!hasVertex(v)) return; \
-    efrom[v].forEachKey([&](K u) { if (ft(u)) eto[u].remove(v); }); \
-    if (ft(v)) efrom[v].clear(); \
-  } \
-  inline void removeInEdges(K v) { \
-    auto ft = [](K u) { return true; }; \
-    removeInEdges(v, ft); \
-  }
-
-#define GRAPH_REMOVE_INEDGES_SCAN(K, V, E, eto) \
-  template <class FT> \
-  inline void removeInEdges(K v, FT ft) { \
-    if (!hasVertex(v)) return; \
-    forEachVertexKey([&](K u) { if (ft(u)) eto[u].remove(v); }); \
-  } \
-  inline void removeInEdges(K v) { \
-    auto ft = [](K u) { return true; }; \
-    removeInEdges(v, ft); \
-  }
-#endif
-
-
-#ifndef GRAPH_REMOVE_VERTEX
-#define GRAPH_REMOVE_VERTEX(K, V, E, vexists, vvalues) \
-  template <class FT> \
-  inline void removeVertex(K u, FT ft) { \
-    if (!hasVertex(u)) return; \
-    removeEdges(u, ft); \
-    removeInEdges(u, ft); \
-    vexists[u] = false; \
-    vvalues[u] = V(); \
-  } \
-  inline void removeVertex(K u) { \
-    auto ft = [](K u) { return true; }; \
-    removeVertex(u, ft); \
-  }
-#endif
-
-
-#ifndef GRAPH_WRITE
-#define GRAPH_WRITE(K, V, E, Bitset, Graph) \
-  template <class K, class V, class E, tclass2 Bitset> \
-  inline void write(ostream& a, const Graph<K, V, E, Bitset>& x, bool detailed=false) { writeGraph(a, x, detailed); } \
-  template <class K, class V, class E, tclass2 Bitset> \
-  inline ostream& operator<<(ostream& a, const Graph<K, V, E, Bitset>& x) { write(a, x); return a; }
-#endif
-
-
-
-
-// DI-GRAPH
-// --------
-// Directed graph that memorizes in- and out-edges for each vertex.
-
-template <class K=uint32_t, class V=NONE, class E=NONE, tclass2 Bitset=LazyBitset>
+#pragma region CLASSES
+/**
+ * Directed graph that memorizes only out-edges for each vertex.
+ * @tparam K key type (vertex id)
+ * @tparam V vertex value type (vertex data)
+ * @tparam E edge value type (edge weight)
+ */
+template <class K=uint32_t, class V=None, class E=None>
 class DiGraph {
-  // Data.
+  #pragma region TYPES
+  public:
+  /** Key type (vertex id). */
+  using key_type = K;
+  /** Vertex value type (vertex data). */
+  using vertex_value_type = V;
+  /** Edge value type (edge weight). */
+  using edge_value_type   = E;
+  #pragma endregion
+
+
+  #pragma region DATA
   protected:
-  size_t N = 0, M = 0;
-  vector<bool> vexists;
-  vector<V>    vvalues;
-  vector<Bitset<K, E>> eto;
-  vector<Bitset<K, E>> efrom;
-  Bitset<K, E> enone;
+  /** Number of vertices. */
+  size_t N = 0;
+  /** Number of edges. */
+  size_t M = 0;
+  /** Vertex existence flags. */
+  vector<bool> exists;
+  /** Vertex values. */
+  vector<V> values;
+  /** Outgoing edges for each vertex (including edge weights). */
+  vector<LazyBitset<K, E>> edges;
+  #pragma endregion
 
-  // Types.
+
+  #pragma region METHODS
+  #pragma region PROPERTIES
   public:
-  GRAPH_TYPES(K, V, E)
-
-  // Property operations.
-  public:
-  GRAPH_SIZE(K, V, E, N, M, vexists)
-  GRAPH_DIRECTED(K, V, E, true)
-
-  // Scan operations.
-  public:
-  GRAPH_VERTICES(K, V, E, vexists, vvalues)
-  GRAPH_EDGES(K, V, E, eto, enone)
-  GRAPH_EDGE_AT(K, V, E, eto, enone)
-  GRAPH_INEDGES(K, V, E, efrom, enone)
-  GRAPH_FOREACH_VERTEX(K, V, E, vexists, vvalues)
-  GRAPH_FOREACH_EDGE(K, V, E, eto)
-  GRAPH_FOREACH_INEDGE(K, V, E, efrom)
-
-  // Access operations.
-  public:
-  GRAPH_HAS(K, V, E, vexists, eto)
-  GRAPH_DEGREES(K, V, E, eto, efrom)
-  GRAPH_VALUES(K, V, E, vvalues, eto)
-  GRAPH_SET_VALUES(K, V, E, vvalues, eto, efrom)
-
-  // Update operations.
-  public:
-  GRAPH_RESERVE_EDGES(K, V, E, eto, efrom)
-  GRAPH_RESERVE(K, V, E, vexists, vvalues, eto, efrom)
-  GRAPH_UPDATE_EDGES(K, V, E, eto, efrom)
-  GRAPH_UPDATE(K, V, E, N, M)
-  GRAPH_RESPAN(K, V, E, vexists, vvalues, eto, efrom)
-  GRAPH_CLEAR(K, V, E, N, M, vexists, vvalues, eto, efrom)
-  GRAPH_ADD_VERTEX(K, V, E, vexists, vvalues)
-  GRAPH_ADD_EDGE(K, V, E, eto, efrom)
-  GRAPH_REMOVE_EDGE(K, V, E, eto, efrom)
-  GRAPH_REMOVE_EDGES(K, V, E, eto, efrom)
-  GRAPH_REMOVE_INEDGES(K, V, E, eto, efrom)
-  GRAPH_REMOVE_VERTEX(K, V, E, vexists, vvalues)
-};
-
-template <class K=uint32_t, class V=NONE, class E=NONE>
-using UnorderedDiGraph = DiGraph<K, V, E, LazyBitset>;
-
-
-
-
-// OUT DI-GRAPH
-// ------------
-// Directed graph that memorizes only out-edges for each vertex.
-
-template <class K=uint32_t, class V=NONE, class E=NONE, tclass2 Bitset=LazyBitset>
-class OutDiGraph {
-  // Data.
-  protected:
-  size_t N = 0, M = 0;
-  vector<bool> vexists;
-  vector<V>    vvalues;
-  vector<Bitset<K, E>> eto;
-  Bitset<K, E> enone;
-
-  // Types.
-  public:
-  GRAPH_TYPES(K, V, E)
-
-  // Property operations.
-  public:
-  GRAPH_SIZE(K, V, E, N, M, vexists)
-  GRAPH_DIRECTED(K, V, E, true)
-
-  // Scan operations.
-  public:
-  GRAPH_VERTICES(K, V, E, vexists, vvalues)
-  GRAPH_EDGES(K, V, E, eto, enone)
-  GRAPH_EDGE_AT(K, V, E, eto, enone)
-  GRAPH_INEDGES_SCAN(K, V, E, eto)
-  GRAPH_FOREACH_VERTEX(K, V, E, vexists, vvalues)
-  GRAPH_FOREACH_EDGE(K, V, E, eto)
-  GRAPH_FOREACH_INEDGE_SCAN(K, V, E, eto)
-
-  // Access operations.
-  public:
-  GRAPH_HAS(K, V, E, vexists, eto)
-  GRAPH_DEGREES_SCAN(K, V, E, eto)
-  GRAPH_VALUES(K, V, E, vvalues, eto)
-  GRAPH_SET_VALUES_SCAN(K, V, E, vvalues, eto)
-
-  // Update operations.
-  public:
-  GRAPH_RESERVE_EDGES_SCAN(K, V, E, eto)
-  GRAPH_RESERVE_SCAN(K, V, E, vexists, vvalues, eto)
-  GRAPH_UPDATE_EDGES_SCAN(K, V, E, eto)
-  GRAPH_UPDATE(K, V, E, N, M)
-  GRAPH_RESPAN_SCAN(K, V, E, vexists, vvalues, eto)
-  GRAPH_CLEAR_SCAN(K, V, E, N, M, vexists, vvalues, eto)
-  GRAPH_ADD_VERTEX(K, V, E, vexists, vvalues)
-  GRAPH_ADD_EDGE_SCAN(K, V, E, eto)
-  GRAPH_REMOVE_EDGE_SCAN(K, V, E, eto)
-  GRAPH_REMOVE_EDGES_SCAN(K, V, E, eto)
-  GRAPH_REMOVE_INEDGES_SCAN(K, V, E, eto)
-  GRAPH_REMOVE_VERTEX(K, V, E, vexists, vvalues)
-};
-
-template <class K=uint32_t, class V=NONE, class E=NONE>
-using LazyOutDiGraph = OutDiGraph<K, V, E, LazyBitset>;
-
-
-
-
-// GRAPH
-// -----
-// Undirected graph.
-
-template <class K=uint32_t, class V=NONE, class E=NONE, tclass2 Bitset=LazyBitset>
-class Graph : public OutDiGraph<K, V, E, Bitset> {
-  using G = OutDiGraph<K, V, E, Bitset>;
-
-  // Property operations.
-  public:
-  inline size_t size() const noexcept { return G::size()/2; }
-  GRAPH_DIRECTED(K, V, E, false)
-
-  // Scan operations.
-  public:
-  GRAPH_INEDGES_COPY(K, V, E)
-  GRAPH_FOREACH_INEDGE_COPY(K, V, E)
-
-  // Access operations.
-  public:
-  inline K inDegree(K v) const noexcept {
-    return degree(v);
+  /**
+   * Get the size of buffer required to store data associated with each vertex
+   * in the graph, indexed by its vertex-id.
+   * @returns size of buffer required
+   */
+  inline size_t span() const noexcept {
+    return exists.size();
   }
 
+  /**
+   * Get the number of vertices in the graph.
+   * @returns |V|
+   */
+  inline size_t order() const noexcept {
+    return N;
+  }
+
+  /**
+   * Get the number of edges in the graph.
+   * @returns |E|
+   */
+  inline size_t size() const noexcept {
+    return M;
+  }
+
+  /**
+   * Check if the graph is empty.
+   * @returns is the graph empty?
+   */
+  inline bool empty() const noexcept {
+    return N == 0;
+  }
+
+  /**
+   * Check if the graph is directed.
+   * @returns is the graph directed?
+   */
+  inline bool directed() const noexcept {
+    return true;
+  }
+  #pragma endregion
+
+
+  #pragma region FOREACH
+  public:
+  /**
+   * Iterate over the vertices in the graph.
+   * @param fp process function (vertex id, vertex data)
+   */
+  template <class FP>
+  inline void forEachVertex(FP fp) const noexcept {
+    for (K u=0; u<span(); ++u)
+      if (exists[u]) fp(u, values[u]);
+  }
+
+  /**
+   * Iterate over the vertex ids in the graph.
+   * @param fp process function (vertex id)
+   */
+  template <class FP>
+  inline void forEachVertexKey(FP fp) const noexcept {
+    for (K u=0; u<span(); ++u)
+      if (exists[u]) fp(u);
+  }
+
+  /**
+   * Iterate over the outgoing edges of a source vertex in the graph.
+   * @param u source vertex id
+   * @param fp process function (target vertex id, edge weight)
+   */
+  template <class FP>
+  inline void forEachEdge(K u, FP fp) const noexcept {
+    edges[u].forEach(fp);
+  }
+
+  /**
+   * Iterate over the target vertex ids of a source vertex in the graph.
+   * @param u source vertex id
+   * @param fp process function (target vertex id)
+   */
+  template <class FP>
+  inline void forEachEdgeKey(K u, FP fp) const noexcept {
+    edges[u].forEachKey(fp);
+  }
+  #pragma endregion
+
+
+  #pragma region ACCESS
+  public:
+  /**
+   * Check if a vertex exists in the graph.
+   * @param u vertex id
+   * @returns does the vertex exist?
+   */
+  inline bool hasVertex(K u) const noexcept {
+    return u < span() && exists[u];
+  }
+
+  /**
+   * Check if an edge exists in the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @returns does the edge exist?
+   */
+  inline bool hasEdge(K u, K v) const noexcept {
+    return u < span() && edges[u].has(v);
+  }
+
+  /**
+   * Get the number of outgoing edges of a vertex in the graph.
+   * @param u vertex id
+   * @returns number of outgoing edges of the vertex
+   */
+  inline size_t degree(K u) const noexcept {
+    return u < span()? edges[u].size() : 0;
+  }
+
+  /**
+   * Get the vertex data of a vertex in the graph.
+   * @param u vertex id
+   * @returns associated data of the vertex
+   */
+  inline V vertexValue(K u) const noexcept {
+    return u < span()? values[u] : V();
+  }
+
+  /**
+   * Set the vertex data of a vertex in the graph.
+   * @param u vertex id
+   * @param d associated data of the vertex
+   * @returns success?
+   */
+  inline bool setVertexValue(K u, V d) noexcept {
+    if (!hasVertex(u)) return false;
+    values[u] = d;
+    return true;
+  }
+
+  /**
+   * Get the edge weight of an edge in the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @returns associated weight of the edge
+   */
+  inline E edgeValue(K u, K v) const noexcept {
+    return u < span()? edges[u].get(v) : E();
+  }
+
+  /**
+   * Set the edge weight of an edge in the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @param w associated weight of the edge
+   * @returns success?
+   */
+  inline bool setEdgeValue(K u, K v, E w) noexcept {
+    if (!hasVertex(u) || !hasVertex(v)) return false;
+    return edges[u].set(v, w);
+  }
+  #pragma endregion
+
+
+  #pragma region UPDATE
+  public:
+  /**
+   * Remove all vertices and edges from the graph.
+   */
+  inline void clear() noexcept {
+    N = 0; M = 0;
+    exists.clear();
+    values.clear();
+    edges.clear();
+  }
+
+  /**
+   * Reserve space for outgoing edges of a vertex in the graph.
+   * @param u source vertex id
+   * @param deg expected degree of the vertex
+   */
+  inline void reserveEdges(K u, size_t deg) {
+    if (u < span()) edges[u].reserve(deg);
+  }
+
+
+  /**
+   * Reserve space for a number of vertices and edges in the graph.
+   * @param n number of vertices to reserve space for
+   * @param deg expected average degree of vertices
+   */
+  inline void reserve(size_t n, size_t deg=0) {
+    size_t S = max(n, span());
+    exists.resize(S);
+    values.resize(S);
+    edges.resize(S);
+    if (deg==0) return;
+    for (K u=0; u<S; ++u)
+      edges[u].reserve(deg);
+  }
+
+  /**
+   * Adjust the span of the graph.
+   * @param n new span
+   * @note This operation is lazy.
+   */
+  inline void respan(size_t n) {
+    exists.resize(n);
+    values.resize(n);
+    edges.resize(n);
+  }
+
+  /**
+   * Update the outgoing edges of a vertex in the graph to reflect the changes.
+   * @param u source vertex id
+   * @param buf scratch buffer for the update
+   */
+  inline void updateEdges(K u, vector<pair<K, E>> *buf=nullptr) {
+    if (u < span()) edges[u].update(buf);
+  }
+
+  /**
+   * Update the graph to reflect the changes.
+   * @note This is an expensive operation.
+   */
+  inline void update() {
+    vector<pair<K, E>> buf;
+    N = 0; M = 0;
+    forEachVertexKey([&](K u) {
+      edges[u].update(&buf);
+      M += degree(u); ++N;
+    });
+  }
+
+  /**
+   * Add a vertex to the graph.
+   * @param u vertex id
+   * @param d associated data of the vertex
+   * @note This operation is lazy.
+   */
+  inline void addVertex(K u, V d=V()) {
+    if (hasVertex(u)) { values[u] = d; return; }
+    if (u >= span()) respan(u+1);
+    exists[u] = true;
+    values[u] = d;
+  }
+
+  /**
+   * Add an outgoing edge to the graph if a condition is met.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @param w associated weight of the edge
+   * @param ft test function (source vertex id)
+   */
   template <class FT>
-  inline void setEdgeValue(K u, K v, E w, FT ft) {
-    G::setEdgeValue(u, v, w, ft);
-    G::setEdgeValue(v, u, w, ft);
-  }
-  inline void setEdgeValue(K u, K v, E w) {
-    auto ft = [](K u) { return true; };
-    setEdgeValue(u, v, w, ft);
+  inline void addEdgeIf(K u, K v, E w, FT ft) {
+    addVertex(u);
+    addVertex(v);
+    if (ft(u)) edges[u].add(v, w);
   }
 
-  // Update operations.
-  public:
-  template <class FT>
-  inline void addEdge(K u, K v, E w, FT ft) {
-    G::addEdge(u, v, w, ft);
-    G::addEdge(v, u, w, ft);
-  }
+  /**
+   * Add an outgoing edge to the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @param w associated weight of the edge
+   * @note This operation is lazy.
+   */
   inline void addEdge(K u, K v, E w=E()) {
     auto ft = [](K u) { return true; };
-    addEdge(u, v, w, ft);
+    addEdgeIf(u, v, w, ft);
   }
 
+  /**
+   * Remove an outgoing edge from the graph if a condition is met.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @param ft test function (source vertex id)
+   */
   template <class FT>
-  inline void removeEdge(K u, K v, FT ft) {
-    G::removeEdge(u, v, ft);
-    G::removeEdge(v, u, ft);
+  inline void removeEdgeIf(K u, K v, FT ft) {
+    if (!hasVertex(u) || !hasVertex(v)) return;
+    if (ft(u)) edges[u].remove(v);
   }
+
+  /**
+   * Remove an outgoing edge from the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @note This operation is lazy.
+   */
   inline void removeEdge(K u, K v) {
     auto ft = [](K u) { return true; };
-    removeEdge(u, v, ft);
+    removeEdgeIf(u, v, ft);
   }
 
-  template <class FT>
-  inline void removeEdges(K u, FT ft) {
-    forEachEdgeKey(u, [&](K v) { G::removeEdge(v, u, ft); });
-    G::removeEdges(u, ft);
+  /**
+   * Remove a vertex from the graph.
+   * @param u vertex id
+   * @note This operation is lazy.
+   */
+  inline void removeVertex(K u) {
+    if (!hasVertex(u)) return;
+    exists[u] = false;
+    values[u] = V();
+    edges[u].clear();
   }
-  inline void removeEdges(K u) {
-    auto ft = [](K u) { return true; };
-    removeEdges(u, ft);
-  }
-
-  template <class FT>
-  inline void removeInEdges(K v, FT ft) {
-    removeEdges(v, ft);
-  }
-  inline void removeInEdges(K v) {
-    auto ft = [](K u) { return true; };
-    removeInEdges(v, ft);
-  }
+  #pragma endregion
+  #pragma endregion
 };
 
-template <class K=uint32_t, class V=NONE, class E=NONE>
-using LazyGraph = Graph<K, V, E, LazyBitset>;
+
+
+/**
+ * A directed graph with CSR representation.
+ * @tparam K key type (vertex id)
+ * @tparam V vertex value type (vertex data)
+ * @tparam E edge value type (edge weight)
+ * @tparam O offset type
+ */
+template <class K=uint32_t, class V=None, class E=None, class O=size_t>
+class DiGraphCsr {
+  #pragma region TYPES
+  public:
+  /** Key type (vertex id). */
+  using key_type = K;
+  /** Vertex value type (vertex data). */
+  using vertex_value_type = V;
+  /** Edge value type (edge weight). */
+  using edge_value_type   = E;
+  #pragma endregion
+
+
+  #pragma region DATA
+  public:
+  /** Offsets of the outgoing edges of vertices. */
+  vector<O> offsets;
+  /** Degree of each vertex. */
+  vector<K> degrees;
+  /** Vertex values. */
+  vector<V> values;
+  /** Vertex ids of the outgoing edges of each vertex (lookup using offsets). */
+  vector<K> edgeKeys;
+  /** Edge weights of the outgoing edges of each vertex (lookup using offsets). */
+  vector<E> edgeValues;
+  #pragma endregion
+
+
+  #pragma region METHODS
+  #pragma region PROPERTIES
+  public:
+  /**
+   * Get the size of buffer required to store data associated with each vertex
+   * in the graph, indexed by its vertex-id.
+   * @returns size of buffer required
+   */
+  inline size_t span() const noexcept {
+    return degrees.size();
+  }
+
+  /**
+   * Get the number of vertices in the graph.
+   * @returns |V|
+   */
+  inline size_t order() const noexcept {
+    return degrees.size();
+  }
+
+  /**
+   * Obtain the number of edges in the graph.
+   * @returns |E|
+   */
+  inline size_t size() const noexcept {
+    size_t M = 0;
+    for (auto d : degrees)
+      M += d;
+    return M;
+  }
+
+  /**
+   * Check if the graph is empty.
+   * @returns is the graph empty?
+   */
+  inline bool empty() const noexcept {
+    return degrees.empty();
+  }
+
+  /**
+   * Check if the graph is directed.
+   * @returns is the graph directed?
+   */
+  inline bool directed() const noexcept {
+    return true;
+  }
+  #pragma endregion
+
+
+  #pragma region FOREACH
+  public:
+  /**
+   * Iterate over the vertices in the graph.
+   * @param fp process function (vertex id, vertex data)
+   */
+  template <class FP>
+  inline void forEachVertex(FP fp) const noexcept {
+    for (K u=0; u<span(); ++u)
+      fp(u, values[u]);
+  }
+
+  /**
+   * Iterate over the vertex ids in the graph.
+   * @param fp process function (vertex id)
+   */
+  template <class FP>
+  inline void forEachVertexKey(FP fp) const noexcept {
+    for (K u=0; u<span(); ++u)
+      fp(u);
+  }
+
+  /**
+   * Iterate over the outgoing edges of a source vertex in the graph.
+   * @param u source vertex id
+   * @param fp process function (target vertex id, edge weight)
+   */
+  template <class FP>
+  inline void forEachEdge(K u, FP fp) const noexcept {
+    size_t i = offsets[u];
+    size_t d = degrees[u];
+    for (size_t I=i+d; i<I; ++i)
+      fp(edgeKeys[i], edgeValues[i]);
+  }
+
+  /**
+   * Iterate over the target vertex ids of a source vertex in the graph.
+   * @param u source vertex id
+   * @param fp process function (target vertex id)
+   */
+  template <class FP>
+  inline void forEachEdgeKey(K u, FP fp) const noexcept {
+    size_t i = offsets[u];
+    size_t d = degrees[u];
+    for (size_t I=i+d; i<I; ++i)
+      fp(edgeKeys[i]);
+  }
+  #pragma endregion
+
+
+  #pragma region OFFSET
+  public:
+  /**
+   * Get the offset of an edge in the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @returns offset of the edge, or -1 if it does not exist
+   */
+  inline size_t edgeOffset(K u, K v) const noexcept {
+    if (!hasVertex(u) || !hasVertex(v)) return size_t(-1);
+    size_t  i = offsets[u];
+    size_t  d = degrees[u];
+    auto   ib = edgeKeys.begin() + i;
+    auto   ie = edgeKeys.begin() + i + d;
+    auto   it = find(ib, ie, v);
+    return it!=ie? it - edgeKeys.begin() : size_t(-1);
+  }
+  #pragma endregion
+
+
+  #pragma region ACCESS
+  public:
+  /**
+   * Check if a vertex exists in the graph.
+   * @param u vertex id
+   * @returns does the vertex exist?
+   */
+  inline bool hasVertex(K u) const noexcept {
+    return u < span();
+  }
+
+  /**
+   * Check if an edge exists in the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @returns does the edge exist?
+   */
+  inline bool hasEdge(K u, K v) const noexcept {
+    size_t o = edgeOffset(u, v);
+    return o != size_t(-1);
+  }
+
+  /**
+   * Get the number of outgoing edges of a vertex in the graph.
+   * @param u vertex id
+   * @returns number of outgoing edges of the vertex
+   */
+  inline size_t degree(K u) const noexcept {
+    return u < span()? degrees[u] : 0;
+  }
+
+  /**
+   * Get the vertex data of a vertex in the graph.
+   * @param u vertex id
+   * @returns associated data of the vertex
+   */
+  inline V vertexValue(K u) const noexcept {
+    return u < span()? values[u] : V();
+  }
+
+  /**
+   * Set the vertex data of a vertex in the graph.
+   * @param u vertex id
+   * @param d associated data of the vertex
+   * @returns success?
+   */
+  inline bool setVertexValue(K u, V d) noexcept {
+    if (!hasVertex(u)) return false;
+    values[u] = d;
+    return true;
+  }
+
+  /**
+   * Get the edge weight of an edge in the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @returns associated weight of the edge
+   */
+  inline E edgeValue(K u, K v) const noexcept {
+    size_t o = edgeOffset(u, v);
+    return o != size_t(-1)? edgeValues[o] : E();
+  }
+
+  /**
+   * Set the edge weight of an edge in the graph.
+   * @param u source vertex id
+   * @param v target vertex id
+   * @param w associated weight of the edge
+   * @returns success?
+   */
+  inline bool setEdgeValue(K u, K v, E w) noexcept {
+    size_t o = edgeOffset(u, v);
+    if (o == size_t(-1)) return false;
+    edgeValues[o] = w;
+    return true;
+  }
+  #pragma endregion
+
+
+  #pragma region UPDATE
+  public:
+  /**
+   * Adjust the span of the graph (or the number of vertices).
+   * @param n new span
+   */
+  inline void respan(size_t n) {
+    offsets.resize(n+1);
+    degrees.resize(n);
+    values.resize(n);
+  }
+  #pragma endregion
+  #pragma endregion
+
+
+  #pragma region CONSTRUCTORS
+  public:
+  /**
+   * Allocate space for CSR representation of a directed graph.
+   * @param n number of vertices
+   * @param m number of edges
+   */
+  DiGraphCsr(size_t n, size_t m) {
+    offsets.resize(n+1);
+    degrees.resize(n);
+    values.resize(n);
+    edgeKeys.resize(m);
+    edgeValues.resize(m);
+  }
+  #pragma endregion
+};
+#pragma endregion
 
 
 
 
-// RETYPE
-// ------
-
-template <class K, class V, class E, tclass2 B, class KA=K, class VA=V, class EA=E>
-constexpr auto retype(const DiGraph<K, V, E, B>& x, KA _k=KA(), VA _v=VA(), EA _e=E()) {
-  return DiGraph<KA, VA, EA, B>();
-}
-template <class K, class V, class E, tclass2 B, class KA=K, class VA=V, class EA=E>
-constexpr auto retype(const OutDiGraph<K, V, E, B>& x, KA _k=KA(), VA _v=VA(), EA _e=E()) {
-  return OutDiGraph<KA, VA, EA, B>();
-}
-template <class K, class V, class E, tclass2 B, class KA=K, class VA=V, class EA=E>
-constexpr auto retype(const Graph<K, V, E, B>& x, KA _k=KA(), VA _v=VA(), EA _e=E()) {
-  return Graph<KA, VA, EA, B>();
-}
-
-
-
-
-// WTITE
-// -----
-
+#pragma region METHODS
+#pragma region WRITE
+/**
+ * Write the only the sizes of a graph to an output stream.
+ * @tparam G graph type
+ * @param a output stream
+ * @param x graph
+ */
 template <class G>
-void writeGraphSizes(ostream& a, const G& x) {
+inline void writeGraphSizes(ostream& a, const G& x) {
   a << "order: " << x.order() << " size: " << x.size();
   a << (x.directed()? " [directed]" : " [undirected]") << " {}";
 }
 
+/**
+ * @brief Write the full details of a graph to an output stream.
+ * @tparam G graph type
+ * @param a output stream
+ * @param x graph
+ */
 template <class G>
-void writeGraphDetailed(ostream& a, const G& x) {
+inline void writeGraphDetailed(ostream& a, const G& x) {
   a << "order: " << x.order() << " size: " << x.size();
   a << (x.directed()? " [directed]" : " [undirected]") << " {\n";
   x.forEachVertex([&](auto u, auto d) {
@@ -720,12 +665,45 @@ void writeGraphDetailed(ostream& a, const G& x) {
   a << "}";
 }
 
+/**
+ * Write a graph to an output stream.
+ * @tparam G graph type
+ * @param a output stream
+ * @param x graph
+ * @param detailed write detailed information?
+ */
 template <class G>
 inline void writeGraph(ostream& a, const G& x, bool detailed=false) {
   if (detailed) writeGraphDetailed(a, x);
   else writeGraphSizes(a, x);
 }
 
-GRAPH_WRITE(K, V, E, Bitset, DiGraph)
-GRAPH_WRITE(K, V, E, Bitset, OutDiGraph)
-GRAPH_WRITE(K, V, E, Bitset, Graph)
+/**
+ * Write a graph to an output stream.
+ * @tparam K vertex id type
+ * @tparam V vertex data type
+ * @tparam E edge weight type
+ * @param a output stream
+ * @param x graph
+ * @param detailed write detailed information?
+ */
+template <class K, class V, class E>
+inline void write(ostream& a, const DiGraph<K, V, E>& x, bool detailed=false) {
+  writeGraph(a, x, detailed);
+}
+
+/**
+ * Write only the sizes of a graph to an output stream.
+ * @tparam K vertex id type
+ * @tparam V vertex data type
+ * @tparam E edge weight type
+ * @param a output stream
+ * @param x graph
+ */
+template <class K, class V, class E>
+inline ostream& operator<<(ostream& a, const DiGraph<K, V, E>& x) {
+  write(a, x);
+  return a;
+}
+#pragma endregion
+#pragma endregion

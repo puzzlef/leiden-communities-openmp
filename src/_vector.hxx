@@ -744,7 +744,7 @@ inline TA inclusiveScanOmpW(TA *a, TA *buf, const TX *x, size_t N, TA acc=TA()) 
     int T = omp_get_num_threads();
     int t = omp_get_thread_num();
     size_t chunkSize = (N + T - 1) / T;
-    size_t i = t * chunkSize;
+    size_t i = min(t * chunkSize, N);
     size_t I = min(i + chunkSize, N);
     buf[t]   = inclusiveScanW(a+i, x+i, I-i);
   }
@@ -756,7 +756,7 @@ inline TA inclusiveScanOmpW(TA *a, TA *buf, const TX *x, size_t N, TA acc=TA()) 
     int T = omp_get_num_threads();
     int t = omp_get_thread_num();
     size_t chunkSize = (N + T - 1) / T;
-    size_t i = t * chunkSize;
+    size_t i = min(t * chunkSize, N);
     size_t I = min(i + chunkSize, N);
     addValueU(a+i, I-i, t==0? acc : buf[t-1] + acc);
   }
@@ -803,7 +803,7 @@ inline TA exclusiveScanOmpW(TA *a, TA *buf, const TX *x, size_t N, TA acc=TA()) 
     int T = omp_get_num_threads();
     int t = omp_get_thread_num();
     size_t chunkSize = (N + T - 1) / T;
-    size_t i = t * chunkSize;
+    size_t i = min(t * chunkSize, N);
     size_t I = min(i + chunkSize, N);
     buf[t]   = exclusiveScanW(a+i, x+i, I-i);
   }
@@ -815,7 +815,7 @@ inline TA exclusiveScanOmpW(TA *a, TA *buf, const TX *x, size_t N, TA acc=TA()) 
     int T = omp_get_num_threads();
     int t = omp_get_thread_num();
     size_t chunkSize = (N + T - 1) / T;
-    size_t i = t * chunkSize;
+    size_t i = min(t * chunkSize, N);
     size_t I = min(i + chunkSize, N);
     addValueU(a+i, I-i, t==0? acc : buf[t-1] + acc);
   }

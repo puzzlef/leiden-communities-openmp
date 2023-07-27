@@ -3,6 +3,10 @@
 #include <vector>
 #include "_main.hxx"
 
+#ifdef OPENMP
+#include <omp.h>
+#endif
+
 using std::pow;
 using std::vector;
 
@@ -44,17 +48,18 @@ inline double modularityCommunities(const vector<T>& cin, const vector<T>& ctot,
   return a;
 }
 
-
+#ifdef OPENMP
 template <class T>
 inline double modularityCommunitiesOmp(const vector<T>& cin, const vector<T>& ctot, double M, double R=1) {
   ASSERT(M>0 && R>0);
   double a = 0;
   size_t C = cin.size();
-  #pragma omp parallel for schedule(auto) reduction(+:a)
+  #pragma omp parallel for schedule(static) reduction(+:a)
   for (size_t i=0; i<C; ++i)
     a += modularityCommunity(cin[i], ctot[i], M, R);
   return a;
 }
+#endif
 
 
 
@@ -68,10 +73,8 @@ inline double modularityCommunitiesOmp(const vector<T>& cin, const vector<T>& ct
  * @returns modularity [-0.5, 1]
  */
 template <class G, class FC>
-inline double modularityBy(const G& x, FC fc, double M, double R=1) {
+inline double modularityByW(vector<double>& cin, vector<double>& ctot, const G& x, FC fc, double M, double R=1) {
   ASSERT(M>0 && R>0);
-  size_t S = x.span();
-  vector<double> cin(S), ctot(S);
   x.forEachVertexKey([&](auto u) {
     size_t c = fc(u);
     x.forEachEdge(u, [&](auto v, auto w) {
@@ -83,50 +86,67 @@ inline double modularityBy(const G& x, FC fc, double M, double R=1) {
   return modularityCommunities(cin, ctot, M, R);
 }
 
+#ifdef OPENMP
 template <class G, class FC>
-inline double modularityByOmp(const G& x, FC fc, double M, double R=1) {
+inline double modularityByOmpW(vector2d<double>& cin, vector2d<double>& ctot, const G& x, FC fc, double M, double R=1) {
   using K = typename G::key_type;
   ASSERT(M>0 && R>0);
   size_t S = x.span();
-  vector<double> cin(S), ctot(S);
-  #pragma omp parallel for schedule(auto)
+  int    T = omp_get_max_threads();
+  #pragma omp parallel
+  {
+    int t = omp_get_thread_num();
+    fillValueU(cin [t], 0.0);
+    fillValueU(ctot[t], 0.0);
+  }
+  #pragma omp parallel for schedule(dynamic, 2048)
   for (K u=0; u<S; ++u) {
+    int t = omp_get_thread_num();
     if (!x.hasVertex(u)) continue;
     size_t c = fc(u);
     x.forEachEdge(u, [&](auto v, auto w) {
       size_t d = fc(v);
-      if (c==d) {
-        #pragma omp atomic
-        cin[c] += w;
-      }
-      #pragma omp atomic
-      ctot[c] += w;
+      if (c==d) cin[t][c] += w;
+      ctot[t][c] += w;
     });
   }
-  return modularityCommunities(cin, ctot, M, R);
+  #pragma omp parallel for schedule(auto)
+  for (size_t c=0; c<S; ++c) {
+    for (int t=1; t<T; ++t) {
+      cin [0][c] += cin [t][c];
+      ctot[0][c] += ctot[t][c];
+    }
+  }
+  return modularityCommunitiesOmp(cin[0], ctot[0], M, R);
 }
+#endif
 
 
-/**
- * Find the modularity of a graph, where each vertex is its own community.
- * @param x original graph
- * @param M total weight of "undirected" graph (1/2 of directed graph)
- * @param R resolution (0, 1]
- * @returns modularity [-0.5, 1]
- */
-template <class G>
-inline double modularity(const G& x, double M, double R=1) {
-  ASSERT(M>0 && R>0 && R<=1);
-  auto fc = [](auto u) { return u; };
-  return modularityBy(x, fc, M, R);
+template <class G, class FC>
+inline double modularityBy(const G& x, FC fc, double M, double R=1) {
+  size_t S = x.span();
+  vector<double> cin(S);
+  vector<double> ctot(S);
+  return modularityByW(cin, ctot, x, fc, M, R);
 }
 
-template <class G>
-inline double modularityOmp(const G& x, double M, double R=1) {
-  ASSERT(M>0 && R>0 && R<=1);
-  auto fc = [](auto u) { return u; };
-  return modularityByOmp(x, fc, M, R);
+#ifdef OPENMP
+template <class G, class FC>
+inline double modularityByOmp(const G& x, FC fc, double M, double R=1) {
+  size_t S = x.span();
+  int    T = omp_get_max_threads();
+  // Limit memory usage to 64GB.
+  size_t VALUES = 64ULL*1024*1024*1024 / 8;
+  int    TADJ   = int(max(VALUES / (2*S), size_t(1)));
+  vector2d<double> cin (TADJ, vector<double>(S));
+  vector2d<double> ctot(TADJ, vector<double>(S));
+  // Run in parallel with limited threads
+  omp_set_num_threads(TADJ);
+  double Q = modularityByOmpW(cin, ctot, x, fc, M, R);
+  omp_set_num_threads(T);
+  return Q;
 }
+#endif
 
 
 
