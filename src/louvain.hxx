@@ -7,7 +7,6 @@
 #include "duplicate.hxx"
 #include "properties.hxx"
 #include "csr.hxx"
-#include "modularity.hxx"
 
 #ifdef OPENMP
 #include <omp.h>

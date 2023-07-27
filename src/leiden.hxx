@@ -7,7 +7,6 @@
 #include "Graph.hxx"
 #include "duplicate.hxx"
 #include "properties.hxx"
-#include "modularity.hxx"
 
 #ifdef OPENMP
 #include <omp.h>
