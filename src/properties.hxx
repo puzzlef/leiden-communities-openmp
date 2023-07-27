@@ -21,7 +21,7 @@ using std::vector;
 template <class G, class K>
 inline double edgeWeight(const G& x, K u) {
   double a = 0;
-  x.forEachEdgeValue(u, [&](auto w) { a += w; });
+  x.forEachEdge(u, [&](auto v, auto w) { a += w; });
   return a;
 }
 

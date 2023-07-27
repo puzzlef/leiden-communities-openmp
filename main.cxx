@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
   omp_set_num_threads(MAX_THREADS);
   LOG("OMP_NUM_THREADS=%d\n", MAX_THREADS);
   LOG("Loading graph %s ...\n", file);
-  OutDiGraph<K, None, V> x;
+  DiGraph<K, None, V> x;
   readMtxOmpW(x, file, weighted); LOG(""); println(x);
   if (!symmetric) { x = symmetricizeOmp(x); LOG(""); print(x); printf(" (symmetricize)\n"); }
   runExperiment(x);
