@@ -56,21 +56,19 @@ void runExperiment(const G& x) {
   // Follow a specific result logging format, which can be easily parsed later.
   auto flog = [&](const auto& ans, const char *technique) {
     printf(
-      "{%09.1f/%09.1fms, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
-      ans.preprocessingTime, ans.time, ans.iterations, ans.passes, getModularity(x, ans, M),
+      "{%09.1fms, %09.1fms preproc, %09.1fms firstpass, %09.1fms locmove, %09.1fms aggr, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
+      ans.time, ans.preprocessingTime, ans.firstPassTime, ans.localMoveTime, ans.aggregationTime,
+      ans.iterations, ans.passes, getModularity(x, ans, M),
       disconnectedCommunitiesDfsOmp(x, ans.membership).size(),
       communities(x, ans.membership).size(), technique
     );
   };
   // Get community memberships on original graph (static).
   auto a0 = louvainStaticOmp(x, init, {repeat});
-  LOG("louvainStaticOmp()\n");
   flog(a0, "louvainStaticOmp");
   auto b0 = leidenStaticOmp<false>(rnd, x, init, {repeat});
-  LOG("leidenStaticOmpGreedy()\n");
   flog(b0, "leidenStaticOmpGreedy");
   auto b1 = leidenStaticOmp<true> (rnd, x, init, {repeat});
-  LOG("leidenStaticOmpRandom()\n");
   flog(b1, "leidenStaticOmpRandom");
 }
 
