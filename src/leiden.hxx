@@ -501,6 +501,7 @@ inline auto leidenChooseCommunityGreedy(const G& x, K u, const vector<K>& vcom, 
 
 /**
  * Choose connected community with best delta modularity.
+ * @param rng random number generator
  * @param x original graph
  * @param u given vertex
  * @param vcom community each vertex belongs to
@@ -513,7 +514,7 @@ inline auto leidenChooseCommunityGreedy(const G& x, K u, const vector<K>& vcom, 
  * @returns [best community, delta modularity]
  */
 template <bool SELF=false, class G, class K, class W>
-inline auto leidenChooseCommunityRandom(const G& x, K u, const vector<K>& vcom, const vector<W>& vtot, const vector<W>& ctot, const vector<K>& vcs, const vector<W>& vcout, double M, double R) {
+inline auto leidenChooseCommunityRandom(xorshift32_engine& rng, const G& x, K u, const vector<K>& vcom, const vector<W>& vtot, const vector<W>& ctot, const vector<K>& vcs, const vector<W>& vcout, double M, double R) {
   K cmax = K(), d = vcom[u];
   W emax = W(), esum = W(), etil = W();
   for (K c : vcs) {
