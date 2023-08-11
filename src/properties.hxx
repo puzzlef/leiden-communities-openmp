@@ -141,71 +141,6 @@ inline double modularityCommunitiesOmp(const vector<V>& cin, const vector<V>& ct
 
 /**
  * Find the modularity of a graph, based on community membership function.
- * @param cin total weight of edges within each community (updated, must be initialized to 0)
- * @param ctot total weight of edges of each community (updated, must be initialized to 0)
- * @param x original graph
- * @param fc community membership function of each vertex (u)
- * @param M total weight of "undirected" graph (1/2 of directed graph)
- * @param R resolution (0, 1]
- * @returns modularity [-0.5, 1]
- */
-template <class G, class FC>
-inline double modularityByW(vector<double>& cin, vector<double>& ctot, const G& x, FC fc, double M, double R=1) {
-  ASSERT(M>0 && R>0);
-  x.forEachVertexKey([&](auto u) {
-    size_t c = fc(u);
-    x.forEachEdge(u, [&](auto v, auto w) {
-      size_t d = fc(v);
-      if (c==d) cin[c] += w;
-      ctot[c] += w;
-    });
-  });
-  return modularityCommunities(cin, ctot, M, R);
-}
-
-
-#ifdef OPENMP
-/**
- * Find the modularity of a graph, based on community membership function.
- * @param cin total weight of edges within each community (updated, must be initialized to 0)
- * @param ctot total weight of edges of each community (updated, must be initialized to 0)
- * @param x original graph
- * @param fc community membership function of each vertex (u)
- * @param M total weight of "undirected" graph (1/2 of directed graph)
- * @param R resolution (0, 1]
- * @returns modularity [-0.5, 1]
- */
-template <class G, class FC>
-inline double modularityByOmpW(vector2d<double>& cin, vector2d<double>& ctot, const G& x, FC fc, double M, double R=1) {
-  using K = typename G::key_type;
-  ASSERT(M>0 && R>0);
-  size_t S = x.span();
-  int    T = omp_get_max_threads();
-  #pragma omp parallel for schedule(dynamic, 2048)
-  for (K u=0; u<S; ++u) {
-    int t = omp_get_thread_num();
-    if (!x.hasVertex(u)) continue;
-    size_t c = fc(u);
-    x.forEachEdge(u, [&](auto v, auto w) {
-      size_t d = fc(v);
-      if (c==d) cin[t][c] += w;
-      ctot[t][c] += w;
-    });
-  }
-  #pragma omp parallel for schedule(auto)
-  for (size_t c=0; c<S; ++c) {
-    for (int t=1; t<T; ++t) {
-      cin [0][c] += cin [t][c];
-      ctot[0][c] += ctot[t][c];
-    }
-  }
-  return modularityCommunitiesOmp(cin[0], ctot[0], M, R);
-}
-#endif
-
-
-/**
- * Find the modularity of a graph, based on community membership function.
  * @param x original graph
  * @param fc community membership function of each vertex (u)
  * @param M total weight of "undirected" graph (1/2 of directed graph)
@@ -214,10 +149,19 @@ inline double modularityByOmpW(vector2d<double>& cin, vector2d<double>& ctot, co
  */
 template <class G, class FC>
 inline double modularityBy(const G& x, FC fc, double M, double R=1) {
+  using  K = typename G::key_type;
+  ASSERT(M>0 && R>0);
   size_t S = x.span();
-  vector<double> cin(S);
-  vector<double> ctot(S);
-  return modularityByW(cin, ctot, x, fc, M, R);
+  vector<double> cin(S), ctot(S);
+  x.forEachVertexKey([&](auto u) {
+    K c = fc(u);
+    x.forEachEdge(u, [&](auto v, auto w) {
+      K d = fc(v);
+      if (c==d) cin[c] += w;
+      ctot[c] += w;
+    });
+  });
+  return modularityCommunities(cin, ctot, M, R);
 }
 
 
@@ -232,18 +176,31 @@ inline double modularityBy(const G& x, FC fc, double M, double R=1) {
  */
 template <class G, class FC>
 inline double modularityByOmp(const G& x, FC fc, double M, double R=1) {
+  using  K = typename G::key_type;
+  ASSERT(M>0 && R>0);
   size_t S = x.span();
-  int    T = omp_get_max_threads();
-  // Limit memory usage to 64GB.
-  size_t VALUES = 64ULL*1024*1024*1024 / 8;
-  int    TADJ   = int(max(VALUES / (2*S), size_t(1)));
-  vector2d<double> cin (TADJ, vector<double>(S));
-  vector2d<double> ctot(TADJ, vector<double>(S));
-  // Run in parallel with limited threads
-  omp_set_num_threads(TADJ);
-  double Q = modularityByOmpW(cin, ctot, x, fc, M, R);
-  omp_set_num_threads(T);
-  return Q;
+  vector<double> vin(S), vtot(S);
+  vector<double> cin(S), ctot(S);
+  #pragma omp parallel for schedule(dynamic, 2048)
+  for (K u=0; u<S; ++u) {
+    if (!x.hasVertex(u)) continue;
+    K c = fc(u);
+    x.forEachEdge(u, [&](auto v, auto w) {
+      K d = fc(v);
+      if (c==d) vin[u] += w;
+      vtot[u] += w;
+    });
+  }
+  #pragma omp parallel for schedule(static, 2048)
+  for (K u=0; u<S; ++u) {
+    if (!x.hasVertex(u)) continue;
+    K c = fc(u);
+    #pragma omp atomic
+    cin[c]  += vin[u];
+    #pragma omp atomic
+    ctot[c] += vtot[u];
+  }
+  return modularityCommunitiesOmp(cin, ctot, M, R);
 }
 #endif
 #pragma endregion
