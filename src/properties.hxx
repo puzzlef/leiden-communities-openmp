@@ -181,6 +181,7 @@ inline double modularityByOmp(const G& x, FC fc, double M, double R=1) {
   size_t S = x.span();
   vector<double> vin(S), vtot(S);
   vector<double> cin(S), ctot(S);
+  // Compute the internal and total weight of each vertex.
   #pragma omp parallel for schedule(dynamic, 2048)
   for (K u=0; u<S; ++u) {
     if (!x.hasVertex(u)) continue;
@@ -191,6 +192,7 @@ inline double modularityByOmp(const G& x, FC fc, double M, double R=1) {
       vtot[u] += w;
     });
   }
+  // Compute the internal and total weight of each community.
   #pragma omp parallel for schedule(static, 2048)
   for (K u=0; u<S; ++u) {
     if (!x.hasVertex(u)) continue;
@@ -231,6 +233,47 @@ inline double deltaModularity(double vcout, double vdout, double vtot, double ct
 
 
 #pragma region COMMUNITIES
+/**
+ * Obtain the size of each community.
+ * @param x original graph
+ * @param vcom community each vertex belongs to
+ * @returns size of each community
+ */
+template <class G, class K>
+inline vector<K> communitySize(const G& x, const vector<K>& vcom) {
+  size_t S = x.span();
+  vector<K> a(S);
+  x.forEachVertexKey([&](auto u) {
+    K c = vcom[u];
+    ++a[c];
+  });
+  return a;
+}
+
+
+#ifdef OPENMP
+/**
+ * Obtain the size of each community.
+ * @param x original graph
+ * @param vcom community each vertex belongs to
+ * @returns size of each community
+ */
+template <class G, class K>
+inline vector<K> communitySizeOmp(const G& x, const vector<K>& vcom) {
+  size_t S = x.span();
+  vector<K> a(S);
+  #pragma omp parallel for schedule(static, 2048)
+  for (K u=0; u<S; ++u) {
+    if (!x.hasVertex(u)) continue;
+    K c = vcom[u];
+    #pragma omp atomic
+    ++a[c];
+  }
+  return a;
+}
+#endif
+
+
 /**
  * Obtain the vertices belonging to each community.
  * @param x original graph
@@ -283,11 +326,11 @@ template <class G, class K>
 inline vector<K> communities(const G& x, const vector<K>& vcom) {
   size_t S = x.span();
   vector<K> a;
-  vector<char> cflag(S);
+  vector<char> vis(S);
   x.forEachVertexKey([&](auto u) {
     K c = vcom[u];
-    if (cflag[c]) return;
-    cflag[c] = 1;
+    if (vis[c]) return;
+    vis[c] = 1;
     a.push_back(c);
   });
   return a;
@@ -298,94 +341,151 @@ inline vector<K> communities(const G& x, const vector<K>& vcom) {
 
 
 #pragma region DISCONNECTED COMMUNITIES
-/**
- * Obtain the community ids of vertices in a graph which are disconnected.
- * @param x original graph
- * @param vcom community each vertex belongs to
- * @returns community ids of disconnected communities
- */
-template <class G, class K>
-inline vector<K> disconnectedCommunities(const G& x, const vector<K>& vcom) {
-  size_t  S = x.span();
-  vector<char> vis(S);
-  vector<K> a;
-  auto comv = communityVertices(x, vcom);
-  LOG("disconnectedCommunities(): communityVertices() done\n");
-  for (K c=0; c<S; ++c) {
-    if (comv[c].empty()) continue;
-    K u = comv[c][0];
-    size_t nvis = 0;
-    fillValueU(vis, char());
-    auto ft = [&](auto v, auto d) { return vcom[v]==c; };
-    auto fp = [&](auto v, auto d) { ++nvis; };
-    bfsVisitedForEachW(vis, x, u, ft, fp);
-    if (nvis<comv[c].size()) a.push_back(c);
-  }
-  return a;
-}
-
-
 #ifdef OPENMP
 /**
- * Obtain the community ids of vertices in a graph which are disconnected.
+ * Examine if each community in a graph is disconnected (using DFS).
  * @param x original graph
  * @param vcom community each vertex belongs to
- * @returns community ids of disconnected communities
+ * @returns whether each community is disconnected
  */
 template <class G, class K>
-inline vector<K> disconnectedCommunitiesOmp(const G& x, const vector<K>& vcom) {
+inline vector<char> communitiesDisconnectedDfsOmp(const G& x, const vector<K>& vcom) {
+  auto t0 = timeNow();
   size_t  S = x.span();
   int     T = omp_get_max_threads();
+  auto coms = communitySizeOmp(x, vcom);
+  vector  <char> a(S);
   vector2d<char> vis(T, vector<char>(S));
-  vector2d<K> a(T);
-  auto comv = communityVerticesOmp(x, vcom);
-  #pragma omp parallel for schedule(auto)
-  for (K c=0; c<S; ++c) {
+  #pragma omp parallel for schedule(dynamic, 2048)
+  for (K u=0; u<S; ++u) {
     int t = omp_get_thread_num();
-    if (comv[c].empty()) continue;
-    K u = comv[c][0];
-    size_t nvis = 0;
-    fillValueU(vis[t], char());
-    auto ft = [&](auto v, auto d) { return vcom[v]==c; };
-    auto fp = [&](auto v, auto d) { ++nvis; };
-    bfsVisitedForEachW(vis[t], x, u, ft, fp);
-    if (nvis<comv[c].size()) a[t].push_back(c);
+    K   c = vcom[u], reached = K();
+    if (coms[c]==0) continue;
+    auto ft = [&](auto v) { return vcom[v]==c; };
+    auto fp = [&](auto v) { ++reached; };
+    dfsVisitedForEachW(vis[t], x, u, ft, fp);
+    if (reached < coms[c]) a[c] = 1;
+    coms[c] = 0;
   }
-  for (int t=1; t<T; ++t)
-    a[0].insert(a[0].end(), a[t].begin(), a[t].end());
-  return a[0];
+  auto t1 = timeNow();
+  printf("communitiesDisconnectedDfsOmp: %.1f\n", duration(t0, t1));
+  return a;
 }
 #endif
 
 
+#ifdef OPENMP
 /**
- * Obtain the community ids of vertices in a graph which are disconnected.
+ * Examine if each community in a graph is disconnected (using BFS).
  * @param x original graph
  * @param vcom community each vertex belongs to
- * @returns community ids of disconnected communities
+ * @returns whether each community is disconnected
  */
 template <class G, class K>
-inline vector<K> disconnectedCommunitiesDfsOmp(const G& x, const vector<K>& vcom) {
+inline vector<char> communitiesDisconnectedBfsOmp(const G& x, const vector<K>& vcom) {
+  auto t0 = timeNow();
   size_t  S = x.span();
   int     T = omp_get_max_threads();
+  auto coms = communitySizeOmp(x, vcom);
+  vector  <char> a(S);
   vector2d<char> vis(T, vector<char>(S));
-  vector2d<K> a(T);
-  auto comv = communityVerticesOmp(x, vcom);
-  #pragma omp parallel for schedule(auto)
-  for (K c=0; c<S; ++c) {
+  vector2d<K>    us (T), vs(T);
+  #pragma omp parallel for schedule(dynamic, 2048)
+  for (K u=0; u<S; ++u) {
     int t = omp_get_thread_num();
-    if (comv[c].empty()) continue;
-    K u = comv[c][0];
-    size_t nvis = 0;
-    fillValueU(vis[t], char());
-    auto ft = [&](auto v) { return vcom[v]==c; };
-    auto fp = [&](auto v) { ++nvis; };
-    dfsVisitedForEachW(vis[t], x, u, ft, fp);
-    if (nvis<comv[c].size()) a[t].push_back(c);
+    K   c = vcom[u], reached = K();
+    if (coms[c]==0) continue;
+    auto ft = [&](auto v, auto d) { return vcom[v]==c; };
+    auto fp = [&](auto v, auto d) { ++reached; };
+    us[t].clear(); vs[t].clear(); us[t].push_back(u);
+    bfsVisitedForEachW(vis[t], us[t], vs[t], x, ft, fp);
+    if (reached < coms[c]) a[c] = 1;
+    coms[c] = 0;
   }
-  for (int t=1; t<T; ++t)
-    a[0].insert(a[0].end(), a[t].begin(), a[t].end());
-  return a[0];
+  auto t1 = timeNow();
+  printf("communitiesDisconnectedBfsOmp: %.1f\n", duration(t0, t1));
+  return a;
 }
+#endif
+
+
+#ifdef OPENMP
+/**
+ * Examine if each community in a graph is disconnected (using single flag vector, DFS).
+ * @param x original graph
+ * @param vcom community each vertex belongs to
+ * @returns whether each community is disconnected
+ */
+template <class G, class K>
+inline vector<char> communitiesDisconnectedLightDfsOmp(const G& x, const vector<K>& vcom) {
+  auto t0 = timeNow();
+  size_t  S = x.span();
+  int     T = omp_get_max_threads();
+  auto coms = communitySizeOmp(x, vcom);
+  vector<char> a(S), vis(S);
+  #pragma omp parallel
+  {
+    for (K u=0; u<S; ++u) {
+      K   c = vcom[u], reached = K();
+      if (coms[c]==0 || !belongsOmp(c)) continue;
+      auto ft = [&](auto v) { return vcom[v]==c; };
+      auto fp = [&](auto v) { ++reached; };
+      dfsVisitedForEachW(vis, x, u, ft, fp);
+      if (reached < coms[c]) a[c] = 1;
+      coms[c] = 0;
+    }
+  }
+  auto t1 = timeNow();
+  printf("communitiesDisconnectedLightDfsOmp: %.1f\n", duration(t0, t1));
+  return a;
+}
+#endif
+
+
+#ifdef OPENMP
+/**
+ * Examine if each community in a graph is disconnected (using single flag vector, BFS).
+ * @param x original graph
+ * @param vcom community each vertex belongs to
+ * @returns whether each community is disconnected
+ */
+template <class G, class K>
+inline vector<char> communitiesDisconnectedLightBfsOmp(const G& x, const vector<K>& vcom) {
+  auto t0 = timeNow();
+  size_t  S = x.span();
+  int     T = omp_get_max_threads();
+  auto coms = communitySizeOmp(x, vcom);
+  vector<char> a(S), vis(S);
+  vector2d<K>  us (T), vs(T);
+  #pragma omp parallel
+  {
+    for (K u=0; u<S; ++u) {
+      int t = omp_get_thread_num();
+      K   c = vcom[u], reached = K();
+      if (coms[c]==0 || !belongsOmp(c)) continue;
+      auto ft = [&](auto v, auto d) { return vcom[v]==c; };
+      auto fp = [&](auto v, auto d) { ++reached; };
+      us[t].clear(); vs[t].clear(); us[t].push_back(u);
+      bfsVisitedForEachW(vis, us[t], vs[t], x, ft, fp);
+      if (reached < coms[c]) a[c] = 1;
+      coms[c] = 0;
+    }
+  }
+  auto t1 = timeNow();
+  printf("communitiesDisconnectedLightBfsOmp: %.1f\n", duration(t0, t1));
+  return a;
+}
+#endif
+
+
+#ifdef OPENMP
+template <bool LIGHT=false, bool BFS=false, class G, class K>
+inline vector<char> communitiesDisconnectedOmp(const G& x, const vector<K>& vcom) {
+  if (!LIGHT && !BFS) return communitiesDisconnectedDfsOmp(x, vcom);
+  if (!LIGHT &&  BFS) return communitiesDisconnectedBfsOmp(x, vcom);
+  if ( LIGHT && !BFS) return communitiesDisconnectedLightDfsOmp(x, vcom);
+  else                return communitiesDisconnectedLightBfsOmp(x, vcom);
+}
+#endif
 #pragma endregion
 #pragma endregion

@@ -59,16 +59,28 @@ void runExperiment(const G& x) {
       "{%09.1fms, %09.1fms preproc, %09.1fms firstpass, %09.1fms locmove, %09.1fms aggr, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
       ans.time, ans.preprocessingTime, ans.firstPassTime, ans.localMoveTime, ans.aggregationTime,
       ans.iterations, ans.passes, getModularity(x, ans, M),
-      disconnectedCommunitiesDfsOmp(x, ans.membership).size(),
+      countValue(communitiesDisconnectedOmp(x, ans.membership), char(1)),
       communities(x, ans.membership).size(), technique
     );
   };
   // Get community memberships on original graph (static).
   auto a0 = louvainStaticOmp(x, init, {repeat});
+  printf("louvainStaticOmp done: %zu/%zu disconnected1\n", countValue(communitiesDisconnectedOmp<false, false>(x, a0.membership), char(1)), communities(x, a0.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected2\n", countValue(communitiesDisconnectedOmp<false, true> (x, a0.membership), char(1)), communities(x, a0.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected3\n", countValue(communitiesDisconnectedOmp<true,  false>(x, a0.membership), char(1)), communities(x, a0.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected4\n", countValue(communitiesDisconnectedOmp<true,  true> (x, a0.membership), char(1)), communities(x, a0.membership).size());
   flog(a0, "louvainStaticOmp");
   auto b0 = leidenStaticOmp<false>(rnd, x, init, {repeat});
+  printf("louvainStaticOmp done: %zu/%zu disconnected1\n", countValue(communitiesDisconnectedOmp<false, false>(x, b0.membership), char(1)), communities(x, b0.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected2\n", countValue(communitiesDisconnectedOmp<false, true> (x, b0.membership), char(1)), communities(x, b0.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected3\n", countValue(communitiesDisconnectedOmp<true,  false>(x, b0.membership), char(1)), communities(x, b0.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected4\n", countValue(communitiesDisconnectedOmp<true,  true> (x, b0.membership), char(1)), communities(x, b0.membership).size());
   flog(b0, "leidenStaticOmpGreedy");
   auto b1 = leidenStaticOmp<true> (rnd, x, init, {repeat});
+  printf("louvainStaticOmp done: %zu/%zu disconnected1\n", countValue(communitiesDisconnectedOmp<false, false>(x, b1.membership), char(1)), communities(x, b1.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected2\n", countValue(communitiesDisconnectedOmp<false, true> (x, b1.membership), char(1)), communities(x, b1.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected3\n", countValue(communitiesDisconnectedOmp<true,  false>(x, b1.membership), char(1)), communities(x, b1.membership).size());
+  printf("louvainStaticOmp done: %zu/%zu disconnected4\n", countValue(communitiesDisconnectedOmp<true,  true> (x, b1.membership), char(1)), communities(x, b1.membership).size());
   flog(b1, "leidenStaticOmpRandom");
 }
 

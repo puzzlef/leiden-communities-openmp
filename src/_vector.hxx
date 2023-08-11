@@ -701,6 +701,69 @@ inline TA sumValuesOmp(const vector<TX>& x, TA a=TA()) {
 
 
 
+#pragma region COUNT VALUE
+/**
+ * Count the number of times a value appears in an array.
+ * @param x an array
+ * @param N size of array
+ * @param v value to count
+ * @returns number of times value appears
+ */
+template <class TX>
+inline size_t countValue(const TX *x, size_t N, const TX& v) {
+  ASSERT(x);
+  size_t a = 0;
+  for (size_t i=0; i<N; ++i)
+    if (x[i]==v) ++a;
+  return a;
+}
+
+/**
+ * Count the number of times a value appears in an array.
+ * @param x a vector
+ * @param v value to count
+ * @returns number of times value appears
+ */
+template <class TX>
+inline size_t countValue(const vector<TX>& x, const TX& v) {
+  return countValue(x.data(), x.size(), v);
+}
+
+
+#ifdef OPENMP
+/**
+ * Count the number of times a value appears in an array.
+ * @param x an array
+ * @param N size of array
+ * @param v value to count
+ * @returns number of times value appears
+ */
+template <class TX>
+inline size_t countValueOmp(const TX *x, size_t N, const TX& v) {
+  ASSERT(x);
+  size_t a = 0;
+  #pragma omp parallel for schedule(auto) reduction(+:a)
+  for (size_t i=0; i<N; ++i)
+    if (x[i]==v) ++a;
+  return a;
+}
+
+/**
+ * Count the number of times a value appears in an array.
+ * @param x a vector
+ * @param v value to count
+ * @returns number of times value appears
+ */
+template <class TX>
+inline size_t countValueOmp(const vector<TX>& x, const TX& v) {
+  return countValueOmp(x.data(), x.size(), v);
+}
+#endif
+#pragma endregion
+
+
+
+
 #pragma region L1-NORM
 /**
  * Compute the L1-norm of an array.
