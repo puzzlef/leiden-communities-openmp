@@ -1138,7 +1138,6 @@ inline void louvainAffectedVerticesFrontierW(vector<B>& vertices, const G& y, co
  * @param deletions edge deletions for this batch update (undirected)
  * @param insertions edge insertions for this batch update (undirected)
  * @param vcom community each vertex belongs to
- * @returns flags for each vertex marking whether it is affected
  */
 template <class B, class G, class K, class V>
 inline void louvainAffectedVerticesFrontierOmpW(vector<B>& vertices, const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {

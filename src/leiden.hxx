@@ -1293,98 +1293,96 @@ inline auto leidenStaticOmp(RND& rnd, const G& x, const vector<K>* q=nullptr, co
 
 
 
-// #pragma region DYNAMIC FRONTIER APPROACH
-// /**
-//  * Find the vertices which should be processed upon a batch of edge insertions and deletions.
-//  * @param vertices vertex affected flags (output)
-//  * @param x original graph
-//  * @param deletions edge deletions for this batch update (undirected, sorted by source vertex id)
-//  * @param insertions edge insertions for this batch update (undirected, sorted by source vertex id)
-//  * @param vcom community each vertex belongs to
-//  * @returns flags for each vertex marking whether it is affected
-//  */
-// template <class B, class G, class K, class V>
-// inline void leidenAffectedVerticesFrontierW(vector<B>& vertices, const G& x, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
-//   fillValueU(vertices, B());
-//   for (const auto& [u, v] : deletions) {
-//     if (vcom[u] != vcom[v]) continue;
-//     vertices[u]  = 1;
-//   }
-//   for (const auto& [u, v, w] : insertions) {
-//     if (vcom[u] == vcom[v]) continue;
-//     vertices[u]  = 1;
-//   }
-// }
+#pragma region DYNAMIC FRONTIER APPROACH
+/**
+ * Find the vertices which should be processed upon a batch of edge insertions and deletions.
+ * @param vertices vertex affected flags (output)
+ * @param y updated graph
+ * @param deletions edge deletions for this batch update (undirected)
+ * @param insertions edge insertions for this batch update (undirected)
+ * @param vcom community each vertex belongs to
+ */
+template <class B, class G, class K, class V>
+inline void leidenAffectedVerticesFrontierW(vector<B>& vertices, const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
+  fillValueU(vertices, B());
+  for (const auto& [u, v] : deletions) {
+    if (vcom[u] != vcom[v]) continue;
+    vertices[u]  = 1;
+  }
+  for (const auto& [u, v, w] : insertions) {
+    if (vcom[u] == vcom[v]) continue;
+    vertices[u]  = 1;
+  }
+}
 
 
-// #ifdef OPENMP
-// /**
-//  * Find the vertices which should be processed upon a batch of edge insertions and deletions.
-//  * @param vertices vertex affected flags (output)
-//  * @param x original graph
-//  * @param deletions edge deletions for this batch update (undirected, sorted by source vertex id)
-//  * @param insertions edge insertions for this batch update (undirected, sorted by source vertex id)
-//  * @param vcom community each vertex belongs to
-//  * @returns flags for each vertex marking whether it is affected
-//  */
-// template <class B, class G, class K, class V>
-// inline void leidenAffectedVerticesFrontierOmpW(vector<B>& vertices, const G& x, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
-//   fillValueOmpU(vertices, B());
-//   size_t D = deletions.size();
-//   size_t I = insertions.size();
-//   #pragma omp parallel for schedule(auto)
-//   for (size_t i=0; i<D; ++i) {
-//     K u = get<0>(deletions[i]);
-//     K v = get<1>(deletions[i]);
-//     if (vcom[u] != vcom[v]) continue;
-//     vertices[u]  = 1;
-//   }
-//   #pragma omp parallel for schedule(auto)
-//   for (size_t i=0; i<I; ++i) {
-//     K u = get<0>(insertions[i]);
-//     K v = get<1>(insertions[i]);
-//     if (vcom[u] == vcom[v]) continue;
-//     vertices[u]  = 1;
-//   }
-// }
-// #endif
+#ifdef OPENMP
+/**
+ * Find the vertices which should be processed upon a batch of edge insertions and deletions.
+ * @param vertices vertex affected flags (output)
+ * @param y updated graph
+ * @param deletions edge deletions for this batch update (undirected)
+ * @param insertions edge insertions for this batch update (undirected)
+ * @param vcom community each vertex belongs to
+ */
+template <class B, class G, class K, class V>
+inline void leidenAffectedVerticesFrontierOmpW(vector<B>& vertices, const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
+  fillValueOmpU(vertices, B());
+  size_t D = deletions.size();
+  size_t I = insertions.size();
+  #pragma omp parallel for schedule(auto)
+  for (size_t i=0; i<D; ++i) {
+    K u = get<0>(deletions[i]);
+    K v = get<1>(deletions[i]);
+    if (vcom[u] != vcom[v]) continue;
+    vertices[u]  = 1;
+  }
+  #pragma omp parallel for schedule(auto)
+  for (size_t i=0; i<I; ++i) {
+    K u = get<0>(insertions[i]);
+    K v = get<1>(insertions[i]);
+    if (vcom[u] == vcom[v]) continue;
+    vertices[u]  = 1;
+  }
+}
+#endif
 
 
 
 
-// /**
-//  * Obtain the community membership of each vertex with Dynamic Frontier Leiden.
-//  * @param y updated graph
-//  * @param deletions edge deletions in batch update
-//  * @param insertions edge insertions in batch update
-//  * @param q initial communities
-//  * @param o Leiden options
-//  * @returns Leiden result
-//  */
-// template <class FLAG=char, class G, class K, class V>
-// inline auto leidenDynamicFrontier(const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>* q, const LeidenOptions& o={}) {
-//   const vector<K>& vcom = *q;
-//   auto fm = [&](auto& vaff) { leidenAffectedVerticesFrontierW(vaff, y, deletions, insertions, vcom); };
-//   return leidenInvoke<FLAG>(y, q, o, fm);
-// }
+/**
+ * Obtain the community membership of each vertex with Dynamic Frontier Leiden.
+ * @param y updated graph
+ * @param deletions edge deletions in batch update
+ * @param insertions edge insertions in batch update
+ * @param q initial communities
+ * @param o leiden options
+ * @returns leiden result
+ */
+template <class FLAG=char, class G, class K, class V>
+inline auto leidenDynamicFrontier(const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>* q, const LeidenOptions& o={}) {
+  const vector<K>& vcom = *q;
+  auto fm = [&](auto& vaff) { leidenAffectedVerticesFrontierW(vaff, y, deletions, insertions, vcom); };
+  return leidenInvoke<FLAG>(y, q, o, fm);
+}
 
 
-// #ifdef OPENMP
-// /**
-//  * Obtain the community membership of each vertex with Dynamic Frontier Leiden.
-//  * @param y updated graph
-//  * @param deletions edge deletions in batch update
-//  * @param insertions edge insertions in batch update
-//  * @param q initial communities
-//  * @param o Leiden options
-//  * @returns Leiden result
-//  */
-// template <class FLAG=char, class G, class K, class V>
-// inline auto leidenDynamicFrontierOmp(const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>* q, const LeidenOptions& o={}) {
-//   const vector<K>& vcom = *q;
-//   auto fm = [&](auto& vaff) { leidenAffectedVerticesFrontierOmpW(vaff, y, deletions, insertions, vcom); };
-//   return leidenInvokeOmp<FLAG>(y, q, o, fm);
-// }
-// #endif
-// #pragma endregion
+#ifdef OPENMP
+/**
+ * Obtain the community membership of each vertex with Dynamic Frontier Leiden.
+ * @param y updated graph
+ * @param deletions edge deletions in batch update
+ * @param insertions edge insertions in batch update
+ * @param q initial communities
+ * @param o leiden options
+ * @returns leiden result
+ */
+template <class FLAG=char, class G, class K, class V>
+inline auto leidenDynamicFrontierOmp(const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>* q, const LeidenOptions& o={}) {
+  const vector<K>& vcom = *q;
+  auto fm = [&](auto& vaff) { leidenAffectedVerticesFrontierOmpW(vaff, y, deletions, insertions, vcom); };
+  return leidenInvokeOmp<FLAG>(y, q, o, fm);
+}
+#endif
+#pragma endregion
 #pragma endregion
