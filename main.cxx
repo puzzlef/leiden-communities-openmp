@@ -13,16 +13,20 @@ using namespace std;
 
 
 
-// Fixed config
+#pragma region CONFIGURATION
 #ifndef TYPE
+/** Type of edge weights. */
 #define TYPE float
 #endif
 #ifndef MAX_THREADS
+/** Maximum number of threads to use. */
 #define MAX_THREADS 64
 #endif
 #ifndef REPEAT_METHOD
+/** Number of times to repeat each method. */
 #define REPEAT_METHOD 1
 #endif
+#pragma endregion
 
 
 
