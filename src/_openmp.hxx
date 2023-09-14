@@ -4,7 +4,7 @@
 
 
 
-#pragma region METHODS
+#pragma region BELONGS
 /**
  * Check if work belongs to current thread.
  * @param key work key

@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <cstdint>
 #include "_debug.hxx"
 
 using std::string;

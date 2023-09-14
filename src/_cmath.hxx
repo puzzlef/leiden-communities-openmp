@@ -1,9 +1,7 @@
 #pragma once
-#include <type_traits>
 #include <cmath>
 #include <random>
 
-using std::is_floating_point;
 using std::uniform_int_distribution;
 using std::ceil;
 using std::sqrt;
@@ -11,19 +9,38 @@ using std::sqrt;
 
 
 
-#pragma region METHODS
 #pragma region CEIL DIV
 /**
- * Calculate ceil(x/y).
+ * Get the ceiling of a division.
  * @param x the dividend
  * @param y the divisor
  * @returns ceil(x/y)
  */
 template <class T>
 inline T ceilDiv(T x, T y) {
-  // For kernel launch calculation.
-  if (is_floating_point<T>::value) return ceil(x/y);
   return (x + y-1) / y;
+}
+
+/**
+ * Get the ceiling of a division.
+ * @param x the dividend
+ * @param y the divisor
+ * @returns ceil(x/y)
+ */
+template <>
+inline float ceilDiv<float>(float x, float y) {
+  return ceil(x / y);
+}
+
+/**
+ * Get the ceiling of a division.
+ * @param x the dividend
+ * @param y the divisor
+ * @returns ceil(x/y)
+ */
+template <>
+inline double ceilDiv<double>(double x, double y) {
+  return ceil(x / y);
 }
 #pragma endregion
 
@@ -119,15 +136,15 @@ inline T nextPrime(T x) {
  * @param begin beginning of the range
  * @param end end of the range
  * @param rnd random number generator
+ * @returns a random prime number in [begin, end] or end+1 if not found
  */
 template <class T, class R>
 inline T randomPrime(T begin, T end, R& rnd) {
   uniform_int_distribution<T> dis(begin, end);
-  for (int i=128; i>0; --i) {
+  for (int i=0; i<128; ++i) {
     T a = dis(rnd);
     if (isPrime(a)) return a;
   }
-  return end-1;
+  return end+1;
 }
-#pragma endregion
 #pragma endregion

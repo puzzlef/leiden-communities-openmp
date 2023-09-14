@@ -158,7 +158,6 @@ inline void readMtxDoOmp(istream& s, bool weighted, FH fh, FB fb) {
   // Process body lines in parallel.
   const int THREADS = omp_get_max_threads();
   const int LINES   = 131072;
-  const size_t CHUNK_SIZE = 1024;
   vector<string> lines(LINES);
   vector<tuple<size_t, size_t, double>> edges(LINES);
   while (true) {

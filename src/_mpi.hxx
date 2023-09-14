@@ -1,10 +1,21 @@
 #pragma once
+#include <chrono>
+#include <ctime>
+#include <cstdio>
+#include <cstdlib>
 #include <mpi.h>
+#include "_debug.hxx"
+
+using std::chrono::system_clock;
+using std::time_t;
+using std::tm;
+using std::localtime;
+using std::fprintf;
+using std::printf;
 
 
 
 
-#pragma region METHODS
 #pragma region ERROR
 #ifndef TRY_MPI
 /**
@@ -31,6 +42,36 @@ void tryFailedMpi(int err, const char* exp, const char* func, int line, const ch
  * @param exp expression to execute
  */
 #define TRY_MPI(exp)  do { int err = exp; if (err != MPI_SUCCESS) tryFailedMpi(err, #exp, __func__, __LINE__, __FILE__); } while (0)
+
+/**
+ * Try to execute an MPI function call only if build mode is error or higher.
+ * @param exp expression to execute
+ **/
+#define TRY_MPIE(exp)  PERFORME(TRY_MPI(exp))
+
+/**
+ * Try to execute an MPI function call only if build mode is warning or higher.
+ * @param exp expression to execute
+ **/
+#define TRY_MPIW(exp)  PERFORMW(TRY_MPI(exp))
+
+/**
+ * Try to execute an MPI function call only if build mode is info or higher.
+ * @param exp expression to execute
+ **/
+#define TRY_MPII(exp)  PERFORMI(TRY_MPI(exp))
+
+/**
+ * Try to execute an MPI function call only if build mode is debug or higher.
+ * @param exp expression to execute
+ **/
+#define TRY_MPID(exp)  PERFORMD(TRY_MPI(exp))
+
+/**
+ * Try to execute an MPI function call only if build mode is trace.
+ * @param exp expression to execute
+ **/
+#define TRY_MPIT(exp)  PERFORMT(TRY_MPI(exp))
 #endif
 
 
@@ -63,7 +104,6 @@ void assertFailedMpi(const char* exp, const char* func, int line, const char* fi
 
 
 
-
 #pragma region BASIC
 /**
  * Get the size of the communicator.
@@ -86,4 +126,30 @@ inline int mpi_comm_rank(MPI_Comm comm=MPI_COMM_WORLD) {
   return rank;
 }
 #pragma endregion
+
+
+
+
+#pragma region LOG
+#ifndef LOG_MPI
+/**
+ * Print log prefix.
+ */
+void logPrefixMpi() {
+  time_t s = system_clock::to_time_t(system_clock::now());
+  tm    *t = localtime(&s);
+  printf("%04d-%02d-%02d %02d:%02d:%02d P%02d:"
+    , t->tm_year + 1900
+    , t->tm_mon  + 1
+    , t->tm_mday
+    , t->tm_hour
+    , t->tm_min
+    , t->tm_sec
+    , mpi_comm_rank()
+  );
+}
+
+/** Log using format. */
+#define LOG_MPI(...) do { logPrefixMpi(); printf(" " __VA_ARGS__); } while (0)
+#endif
 #pragma endregion

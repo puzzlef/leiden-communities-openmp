@@ -9,6 +9,7 @@ using std::copy;
 
 
 
+#pragma region METHODS
 /**
  * Find the first element that does not match its adjacent element.
  * @param ib begin iterator
@@ -229,3 +230,4 @@ inline auto set_union_last_inplace(IX xb, IX xe, IY yb, IY ye, IB bb, IB be) {
   auto fe = [](const auto& a, const auto& b) { return a == b; };
   return set_union_last_inplace(xb, xe, yb, ye, bb, be, fl, fe);
 }
+#pragma endregion

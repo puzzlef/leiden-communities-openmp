@@ -1,10 +1,10 @@
 #pragma once
-#include <cstdint>
 #include <utility>
-#include <algorithm>
 #include <vector>
-#include "_ctypes.hxx"
+#include <algorithm>
+#include <cstdint>
 #include "_algorithm.hxx"
+#include "_ctypes.hxx"
 
 using std::pair;
 using std::vector;

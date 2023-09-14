@@ -1084,6 +1084,7 @@ inline TA l2NormDeltaOmp(const vector<TX>& x, const vector<TY>& y, TA a=TA()) {
   return l2NormDeltaOmp(x.data(), y.data(), x.size(), a);
 }
 #endif
+#pragma endregion
 
 
 

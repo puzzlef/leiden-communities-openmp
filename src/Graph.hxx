@@ -286,10 +286,21 @@ class DiGraph {
   /**
    * Add a vertex to the graph.
    * @param u vertex id
+   * @note This operation is lazy.
+   */
+  inline void addVertex(K u) {
+    if (hasVertex(u)) return;
+    if (u >= span()) respan(u+1);
+    exists[u] = true;
+  }
+
+  /**
+   * Add a vertex to the graph.
+   * @param u vertex id
    * @param d associated data of the vertex
    * @note This operation is lazy.
    */
-  inline void addVertex(K u, V d=V()) {
+  inline void addVertex(K u, V d) {
     if (hasVertex(u)) { values[u] = d; return; }
     if (u >= span()) respan(u+1);
     exists[u] = true;

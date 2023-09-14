@@ -25,7 +25,6 @@ using std::cout;
 
 
 
-#pragma region METHODS
 #pragma region WRITE
 /**
  * Write values to a stream.
@@ -216,5 +215,4 @@ inline void println(const T& x) {
 inline void println() {
   cout << "\n";
 }
-#pragma endregion
 #pragma endregion

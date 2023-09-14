@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <cstdint>
 #include <cmath>
 #include "_main.hxx"
 #include "bfs.hxx"
@@ -15,10 +16,52 @@ using std::pow;
 
 
 #pragma region METHODS
+#pragma region GRAPH DATA
+/**
+ * Obtain the vertex keys of a graph.
+ * @param x given graph
+ * @returns vertex keys
+ */
+template <class G>
+inline auto vertexKeys(const G& x) {
+  using  K = typename G::key_type;
+  size_t N = x.order();
+  vector<K> a;
+  a.reserve(N);
+  x.forEachVertexKey([&](auto u) { a.push_back(u); });
+  return a;
+}
+
+
+/**
+ * Obtain the vertex value of each vertex.
+ * @param a vertex value of each vertex (output)
+ * @param x given graph
+ */
+template <class G, class V>
+inline void vertexValuesW(vector<V>& a, const G& x) {
+  x.forEachVertex([&](auto u, auto d) { a[u] = d; });
+}
+
+
+/**
+ * Obtain the outgoing degree of each vertex.
+ * @param a degrees of each vertex (output)
+ * @param x given graph
+ */
+template <class G, class K>
+inline void degreesW(vector<K>& a, const G& x) {
+  x.forEachVertexKey([&](auto u) { a[u] = x.degree(u); });
+}
+#pragma endregion
+
+
+
+
 #pragma region EDGE WEIGHT
 /**
  * Find the total outgoing edge weight of a vertex.
- * @param x original graph
+ * @param x given graph
  * @param u given vertex
  * @returns total outgoing weight of a vertex
  */
@@ -32,7 +75,7 @@ inline double edgeWeight(const G& x, K u) {
 
 /**
  * Find the total edge weight of a graph.
- * @param x original graph
+ * @param x given graph
  * @returns total edge weight (undirected graph => each edge considered twice)
  */
 template <class G>
@@ -46,7 +89,7 @@ inline double edgeWeight(const G& x) {
 #ifdef OPENMP
 /**
  * Find the total edge weight of a graph.
- * @param x original graph
+ * @param x given graph
  * @returns total edge weight (undirected graph => each edge considered twice)
  */
 template <class G>
@@ -62,22 +105,6 @@ inline double edgeWeightOmp(const G& x) {
   return a;
 }
 #endif
-#pragma endregion
-
-
-
-
-#pragma region DEGREES
-/**
- * Find the outgoing degree of each vertex.
- * @param a degrees of each vertex (output)
- * @param x original graph
- * @returns outgoing degree of each vertex
- */
-template <class G, class K>
-inline void degreesW(vector<K>& a, const G& x) {
-  x.forEachVertexKey([&](auto u) { a[u] = x.degree(u); });
-}
 #pragma endregion
 
 
@@ -141,7 +168,7 @@ inline double modularityCommunitiesOmp(const vector<V>& cin, const vector<V>& ct
 
 /**
  * Find the modularity of a graph, based on community membership function.
- * @param x original graph
+ * @param x given graph
  * @param fc community membership function of each vertex (u)
  * @param M total weight of "undirected" graph (1/2 of directed graph)
  * @param R resolution (0, 1]
@@ -168,7 +195,7 @@ inline double modularityBy(const G& x, FC fc, double M, double R=1) {
 #ifdef OPENMP
 /**
  * Find the modularity of a graph, based on community membership function.
- * @param x original graph
+ * @param x given graph
  * @param fc community membership function of each vertex (u)
  * @param M total weight of "undirected" graph (1/2 of directed graph)
  * @param R resolution (0, 1]
@@ -235,7 +262,7 @@ inline double deltaModularity(double vcout, double vdout, double vtot, double ct
 #pragma region COMMUNITIES
 /**
  * Obtain the size of each community.
- * @param x original graph
+ * @param x given graph
  * @param vcom community each vertex belongs to
  * @returns size of each community
  */
@@ -254,7 +281,7 @@ inline vector<K> communitySize(const G& x, const vector<K>& vcom) {
 #ifdef OPENMP
 /**
  * Obtain the size of each community.
- * @param x original graph
+ * @param x given graph
  * @param vcom community each vertex belongs to
  * @returns size of each community
  */
@@ -276,7 +303,7 @@ inline vector<K> communitySizeOmp(const G& x, const vector<K>& vcom) {
 
 /**
  * Obtain the vertices belonging to each community.
- * @param x original graph
+ * @param x given graph
  * @param vcom community each vertex belongs to
  * @returns vertices belonging to each community
  */
@@ -295,7 +322,7 @@ inline vector2d<K> communityVertices(const G& x, const vector<K>& vcom) {
 #ifdef OPENMP
 /**
  * Obtain the vertices belonging to each community.
- * @param x original graph
+ * @param x given graph
  * @param vcom community each vertex belongs to
  * @returns vertices belonging to each community
  */
@@ -318,7 +345,7 @@ inline vector2d<K> communityVerticesOmp(const G& x, const vector<K>& vcom) {
 
 /**
  * Obtain the community ids of vertices in a graph.
- * @param x original graph
+ * @param x given graph
  * @param vcom community each vertex belongs to
  * @returns community ids
  */
@@ -344,7 +371,7 @@ inline vector<K> communities(const G& x, const vector<K>& vcom) {
 #ifdef OPENMP
 /**
  * Examine if each community in a graph is disconnected (using single flag vector, BFS).
- * @param x original graph
+ * @param x given graph
  * @param vcom community each vertex belongs to
  * @returns whether each community is disconnected
  */
