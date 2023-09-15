@@ -5,7 +5,7 @@ const path = require('path');
 const ROMPTH = /^OMP_NUM_THREADS=(\d+)/;
 const RGRAPH = /^Loading graph .*\/(.*?)\.mtx \.\.\./m;
 const RORDER = /^order: (\d+) size: (\d+) (?:\[\w+\] )?\{\}/m;
-const RRESLT = /^\{-(.+?)\/\+(.+?) \[(\d+)\] batch, (.+?) threads\} -> \{(.+?)\/(.+?)ms, (.+?) iters, (.+?) passes, (.+?) modularity\} (.+)/m;
+const RRESLT = /^\{(.+?)ms, (.+?)ms preproc, (.+?)ms firstpass, (.+?)ms locmove, (.+?)ms aggr, (.+?) iters, (.+?) passes, (.+?) modularity, (.+?)\/(.+?) disconnected\} (.+)/m;
 
 
 
@@ -60,17 +60,18 @@ function readLogLine(ln, data, state) {
     state.size  = parseFloat(size);
   }
   else if (RRESLT.test(ln)) {
-    var [, batch_deletions_size, batch_insertions_size, batch_index, num_threads, preprocessing_time, time, iterations, passes, modularity, technique] = RRESLT.exec(ln);
+    var [, time, preprocessing_time, first_pass_time, local_moving_phase_time, aggregation_phase_time, iterations, passes, modularity, disconnected_communities, total_communities, technique] = RRESLT.exec(ln);
     data.get(state.graph).push(Object.assign({}, state, {
-      batch_deletions_size:  parseFloat(batch_deletions_size),
-      batch_insertions_size: parseFloat(batch_insertions_size),
-      batch_index: parseFloat(batch_index),
-      num_threads: parseFloat(num_threads),
-      preprocessing_time:    parseFloat(preprocessing_time),
       time:        parseFloat(time),
+      preprocessing_time:      parseFloat(preprocessing_time),
+      first_pass_time:         parseFloat(first_pass_time),
+      local_moving_phase_time: parseFloat(local_moving_phase_time),
+      aggregation_phase_time:  parseFloat(aggregation_phase_time),
       iterations:  parseFloat(iterations),
       passes:      parseFloat(passes),
       modularity:  parseFloat(modularity),
+      disconnected_communities: parseFloat(disconnected_communities),
+      total_communities:        parseFloat(total_communities),
       technique,
     }));
   }
