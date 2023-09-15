@@ -659,8 +659,10 @@ inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vec
   size_t S = x.span();
   int l = 0;
   W  el = W();
+  const int PICKSTEP = 4;
   for (; l<L;) {
     el = W();
+    bool PICKLESS = l % PICKSTEP == 0;
     #pragma omp parallel for schedule(dynamic, 2048) reduction(+:el)
     for (K u=0; u<S; ++u) {
       int t = omp_get_thread_num();
@@ -669,11 +671,11 @@ inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vec
       leidenClearScanW(*vcs[t], *vcout[t]);
       leidenScanCommunitiesW<false, REFINE>(*vcs[t], *vcout[t], x, u, vcom, vcob);
       auto [c, e] = leidenChooseCommunity<false, RANDOM>(*rng[t], x, u, vcom, vtot, ctot, *vcs[t], *vcout[t], M, R);
-      if (c)      { leidenChangeCommunityOmpW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
+      if (c && !PICKLESS || c>vcom[u]) { leidenChangeCommunityOmpW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
       vaff[u] = B();
       el += e;  // l1-norm
     }
-    if (fc(el, l++)) break;
+    if (!PICKLESS && fc(el, l++)) break;
   }
   return l>1 || el? l : 0;
 }
