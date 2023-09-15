@@ -70,18 +70,38 @@ void runExperiment(const G& x) {
   // Get community memberships on original graph (static).
   auto a0 = louvainStaticOmp(x, init, {repeat});
   flog(a0, "louvainStaticOmp");
-  auto b0 = leidenStaticOmp<false>(rnd, x, init, {repeat});
-  flog(b0, "leidenStaticOmpGreedy");
-  auto c0 = leidenStaticOmp<false>(rnd, x, init, {repeat, 1.0, 1e-06, 1.0, 10.0, 100, 100});
-  flog(c0, "leidenStaticOmpGreedyMedium");
-  auto d0 = leidenStaticOmp<false>(rnd, x, init, {repeat, 1.0, 1e-10, 1.0, 10.0, 100, 100});
-  flog(d0, "leidenStaticOmpGreedyHeavy");
-  auto b1 = leidenStaticOmp<true> (rnd, x, init, {repeat});
-  flog(b1, "leidenStaticOmpRandom");
-  auto c1 = leidenStaticOmp<true> (rnd, x, init, {repeat, 1.0, 1e-06, 1.0, 10.0, 100, 100});
-  flog(c1, "leidenStaticOmpRandomMedium");
-  auto d1 = leidenStaticOmp<true> (rnd, x, init, {repeat, 1.0, 1e-10, 1.0, 10.0, 100, 100});
-  flog(d1, "leidenStaticOmpRandomHeavy");
+  {
+    auto b0 = leidenStatic<false>(rnd, x, init, {repeat});
+    flog(b0, "leidenStaticGreedy");
+    auto c0 = leidenStatic<false>(rnd, x, init, {repeat, 1.0, 1e-06, 1.0, 10.0, 100, 100});
+    flog(c0, "leidenStaticGreedyMedium");
+    auto d0 = leidenStatic<false>(rnd, x, init, {repeat, 1.0, 1e-10, 1.0, 10.0, 100, 100});
+    flog(d0, "leidenStaticGreedyHeavy");
+  }
+  {
+    auto b1 = leidenStatic<true> (rnd, x, init, {repeat});
+    flog(b1, "leidenStaticRandom");
+    auto c1 = leidenStatic<true> (rnd, x, init, {repeat, 1.0, 1e-06, 1.0, 10.0, 100, 100});
+    flog(c1, "leidenStaticRandomMedium");
+    auto d1 = leidenStatic<true> (rnd, x, init, {repeat, 1.0, 1e-10, 1.0, 10.0, 100, 100});
+    flog(d1, "leidenStaticRandomHeavy");
+  }
+  {
+    auto b0 = leidenStaticOmp<false>(rnd, x, init, {repeat});
+    flog(b0, "leidenStaticOmpGreedy");
+    auto c0 = leidenStaticOmp<false>(rnd, x, init, {repeat, 1.0, 1e-06, 1.0, 10.0, 100, 100});
+    flog(c0, "leidenStaticOmpGreedyMedium");
+    auto d0 = leidenStaticOmp<false>(rnd, x, init, {repeat, 1.0, 1e-10, 1.0, 10.0, 100, 100});
+    flog(d0, "leidenStaticOmpGreedyHeavy");
+  }
+  {
+    auto b1 = leidenStaticOmp<true> (rnd, x, init, {repeat});
+    flog(b1, "leidenStaticOmpRandom");
+    auto c1 = leidenStaticOmp<true> (rnd, x, init, {repeat, 1.0, 1e-06, 1.0, 10.0, 100, 100});
+    flog(c1, "leidenStaticOmpRandomMedium");
+    auto d1 = leidenStaticOmp<true> (rnd, x, init, {repeat, 1.0, 1e-10, 1.0, 10.0, 100, 100});
+    flog(d1, "leidenStaticOmpRandomHeavy");
+  }
 }
 
 

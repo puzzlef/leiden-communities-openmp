@@ -1054,7 +1054,7 @@ inline void leidenAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K>
  * @param fm marking affected vertices / preprocessing to be performed (vaff)
  * @returns leiden result
  */
-template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class FM, class FA>
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class FM>
 inline auto leidenInvoke(RND& rnd, const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   using  W = LEIDEN_WEIGHT_TYPE;
   using  B = FLAG;
