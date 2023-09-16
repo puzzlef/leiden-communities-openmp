@@ -511,6 +511,7 @@ inline int louvainMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, ve
     }
     if (fc(el, l++)) break;
   }
+  printf("louvainMoveOmpW: l=%d, el=%e\n", l, el);
   return l>1 || el? l : 0;
 }
 #endif
@@ -1031,6 +1032,9 @@ inline auto louvainInvokeOmp(const G& x, const vector<K> *q, const LouvainOption
           else         m = louvainMoveOmpW(vcom, ctot, vaff, vcs, vcout, y, vtot, M, R, L, fc);
         });
         l += max(m, 1); ++p;
+        auto fq = [&](auto& u) { return vcom[u]; };
+        if (isFirst) printf("louvainMoveOmpW: m=%d, l=%d, p=%d, Q=%f\n", m, l, p, modularityByOmp(x, fq, M, R));
+        else         printf("louvainMoveOmpW: m=%d, l=%d, p=%d, Q=%f\n", m, l, p, modularityByOmp(y, fq, M, R));
         if (m<=1 || p>=P) break;
         size_t GN = isFirst? x.order() : y.order();
         size_t GS = isFirst? x.span()  : y.span();

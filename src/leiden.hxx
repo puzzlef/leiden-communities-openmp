@@ -675,6 +675,7 @@ inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vec
     }
     if (fc(el, l++)) break;
   }
+  printf("leidenMoveOmpW: l=%d, el=%e\n", l, el);
   return l>1 || el? l : 0;
 }
 #endif
@@ -1207,19 +1208,24 @@ inline auto leidenInvokeOmp(RND& rnd, const G& x, const vector<K> *q, const Leid
         tl += measureDuration([&]() {
           if (isFirst) m += leidenMoveOmpW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, rng, x, vcob, vtot, M, R, L, fc);
           else         m += leidenMoveOmpW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, rng, y, vcob, vtot, M, R, L, fc);
+          fillValueOmpU(vaff.data(), isFirst? x.order() : y.order(), B(1));
           if (isFirst) leidenInitializeCommunityWeightsOmpW(ctot, x, vtot);
           else         leidenInitializeCommunityWeightsOmpW(ctot, y, vtot);
           if (isFirst) m += leidenMoveOmpW<true,  RANDOM>(vcom, ctot, vaff, vcs, vcout, rng, x, vcob, vtot, M, R, L, fc);
           else         m += leidenMoveOmpW<true,  RANDOM>(vcom, ctot, vaff, vcs, vcout, rng, y, vcob, vtot, M, R, L, fc);
         });
         l += max(m, 1); ++p;
+        auto fq = [&](auto& u) { return vcob[u]; };
+        auto fr = [&](auto& u) { return vcom[u]; };
+        if (isFirst) printf("leidenMoveOmpW: m=%d, l=%d, p=%d, QB=%f, QC=%f\n", m, l, p, modularityByOmp(x, fq, M, R), modularityByOmp(x, fr, M, R));
+        else         printf("leidenMoveOmpW: m=%d, l=%d, p=%d, QB=%f, QC=%f\n", m, l, p, modularityByOmp(y, fq, M, R), modularityByOmp(y, fr, M, R));
         if (m<=1 || p>=P) break;
         size_t GN = isFirst? x.order() : y.order();
         size_t GS = isFirst? x.span()  : y.span();
         size_t CN = 0;
         if (isFirst) CN = leidenCommunityExistsOmpW(cv.degrees, x, vcom);
         else         CN = leidenCommunityExistsOmpW(cv.degrees, y, vcom);
-        if (double(CN)/GN >= o.aggregationTolerance) break;
+        // if (double(CN)/GN >= o.aggregationTolerance) break;
         if (isFirst) leidenRenumberCommunitiesOmpW(vcom, cv.degrees, bufk, x);
         else         leidenRenumberCommunitiesOmpW(vcom, cv.degrees, bufk, y);
         if (isFirst) copyValuesOmpW(a, vcom);
