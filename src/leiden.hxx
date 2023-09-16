@@ -1054,7 +1054,7 @@ inline void leidenAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K>
  * @param fm marking affected vertices / preprocessing to be performed (vaff)
  * @returns leiden result
  */
-template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class FM, class FA>
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class FM>
 inline auto leidenInvoke(RND& rnd, const G& x, const vector<K> *q, const LeidenOptions& o, FM fm) {
   using  W = LEIDEN_WEIGHT_TYPE;
   using  B = FLAG;
@@ -1101,6 +1101,8 @@ inline auto leidenInvoke(RND& rnd, const G& x, const vector<K> *q, const LeidenO
         tl += measureDuration([&]() {
           if (isFirst) m += leidenMoveW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, *rng[0], x, vcob, vtot, M, R, L, fc);
           else         m += leidenMoveW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, *rng[0], y, vcob, vtot, M, R, L, fc);
+          if (isFirst) fillValueOmpU(vaff.data(), x.order(), B(1));
+          else         fillValueOmpU(vaff.data(), y.order(), B(1));
           if (isFirst) leidenInitializeCommunityWeightsW(ctot, x, vtot);
           else         leidenInitializeCommunityWeightsW(ctot, y, vtot);
           if (isFirst) m += leidenMoveW<true,  RANDOM>(vcom, ctot, vaff, vcs, vcout, *rng[0], x, vcob, vtot, M, R, L, fc);
@@ -1207,6 +1209,8 @@ inline auto leidenInvokeOmp(RND& rnd, const G& x, const vector<K> *q, const Leid
         tl += measureDuration([&]() {
           if (isFirst) m += leidenMoveOmpW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, rng, x, vcob, vtot, M, R, L, fc);
           else         m += leidenMoveOmpW<false, RANDOM>(vcob, ctot, vaff, vcs, vcout, rng, y, vcob, vtot, M, R, L, fc);
+          if (isFirst) fillValueOmpU(vaff.data(), x.order(), B(1));
+          else         fillValueOmpU(vaff.data(), y.order(), B(1));
           if (isFirst) leidenInitializeCommunityWeightsOmpW(ctot, x, vtot);
           else         leidenInitializeCommunityWeightsOmpW(ctot, y, vtot);
           if (isFirst) m += leidenMoveOmpW<true,  RANDOM>(vcom, ctot, vaff, vcs, vcout, rng, x, vcob, vtot, M, R, L, fc);
