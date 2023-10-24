@@ -65,8 +65,12 @@ struct RakResult {
   int iterations;
   /** Time spent in milliseconds. */
   float time;
-  /** Time spent in milliseconds for preprocessing. */
-  float preprocessingTime;
+  /** Time spent in milliseconds for initial marking of affected vertices. */
+  float markingTime;
+  /** Time spent in initializing community memberships. */
+  float initializationTime;
+  /** Number of vertices initially marked as affected. */
+  size_t affectedVertices;
   #pragma endregion
 
 
@@ -76,10 +80,12 @@ struct RakResult {
    * @param membership community membership each vertex belongs to
    * @param iterations number of iterations performed
    * @param time time spent in milliseconds
-   * @param preprocessingTime time spent in milliseconds for preprocessing
+   * @param markingTime time spent in milliseconds for initial marking of affected vertices
+   * @param initializationTime time spent in initializing community memberships
+   * @param affectedVertices number of vertices initially marked as affected
    */
-  RakResult(vector<K>&& membership, int iterations=0, float time=0, float preprocessingTime=0) :
-  membership(membership), iterations(iterations), time(time), preprocessingTime(preprocessingTime) {}
+  RakResult(vector<K>&& membership, int iterations=0, float time=0, float markingTime=0, float initializationTime=0, size_t affectedVertices=0) :
+  membership(membership), iterations(iterations), time(time), markingTime(markingTime), initializationTime(initializationTime), affectedVertices(affectedVertices) {}
 
 
   /**
@@ -87,10 +93,12 @@ struct RakResult {
    * @param membership community membership each vertex belongs to (moved)
    * @param iterations number of iterations performed
    * @param time time spent in milliseconds
-   * @param preprocessingTime time spent in milliseconds for preprocessing
+   * @param markingTime time spent in milliseconds for initial marking of affected vertices
+   * @param initializationTime time spent in initializing community memberships
+   * @param affectedVertices number of vertices initially marked as affected
    */
-  RakResult(vector<K>& membership, int iterations=0, float time=0, float preprocessingTime=0) :
-  membership(move(membership)), iterations(iterations), time(time), preprocessingTime(preprocessingTime) {}
+  RakResult(vector<K>& membership, int iterations=0, float time=0, float markingTime=0, float initializationTime=0, size_t affectedVertices=0) :
+  membership(move(membership)), iterations(iterations), time(time), markingTime(markingTime), initializationTime(initializationTime), affectedVertices(affectedVertices) {}
   #pragma endregion
 };
 #pragma endregion
@@ -209,7 +217,7 @@ inline void rakInitializeFromOmpW(vector<K>& vcom, const G& x, const vector<K>& 
  * @param vcom community each vertex belongs to
  */
 template <bool SELF=false, class K, class V, class W>
-inline void rakScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom) {
+inline void rakScanCommunityU(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom) {
   if (!SELF && u==v) return;
   K c = vcom[v];
   if (!vcout[c]) vcs.push_back(c);
@@ -227,7 +235,7 @@ inline void rakScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, c
  */
 template <bool SELF=false, class G, class K, class W>
 inline void rakScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x, K u, const vector<K>& vcom) {
-  x.forEachEdge(u, [&](auto v, auto w) { rakScanCommunityW<SELF>(vcs, vcout, u, v, w, vcom); });
+  x.forEachEdge(u, [&](auto v, auto w) { rakScanCommunityU<SELF>(vcs, vcout, u, v, w, vcom); });
 }
 
 
@@ -275,13 +283,14 @@ inline pair<K, W> rakChooseCommunity(const G& x, K u, const vector<K>& vcom, con
  * @param vcs communities vertex u is linked to (temporary buffer, updated)
  * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
  * @param x original graph
+ * @param fa is vertex allowed to be updated? (u)
  * @returns number of changed vertices
  */
-template <class G, class K, class W, class F>
-inline size_t rakMoveIterationW(vector<K>& vcom, vector<F>& vaff, vector<K>& vcs, vector<W>& vcout, const G& x) {
+template <class G, class K, class W, class F, class FA>
+inline size_t rakMoveIterationW(vector<K>& vcom, vector<F>& vaff, vector<K>& vcs, vector<W>& vcout, const G& x, FA fa) {
   size_t a = 0;
   x.forEachVertexKey([&](auto u) {
-    if (!vaff[u]) return;
+    if (!fa(u) || !vaff[u]) return;
     K d = vcom[u];
     rakClearScanW(vcs, vcout);
     rakScanCommunitiesW(vcs, vcout, x, u, vcom);
@@ -301,17 +310,18 @@ inline size_t rakMoveIterationW(vector<K>& vcom, vector<F>& vaff, vector<K>& vcs
  * @param vcs communities vertex u is linked to (temporary buffer, updated)
  * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
  * @param x original graph
+ * @param fa is vertex allowed to be updated? (u)
  * @returns number of changed vertices
  */
-template <class G, class K, class W, class F>
-inline size_t rakMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x) {
+template <class G, class K, class W, class F, class FA>
+inline size_t rakMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, FA fa) {
   size_t a = K();
   size_t S = x.span();
   #pragma omp parallel for schedule(dynamic, 2048) reduction(+:a)
   for (K u=0; u<S; ++u) {
     int t = omp_get_thread_num();
     if (!x.hasVertex(u)) continue;
-    if (!vaff[u]) continue;
+    if (!fa(u) || !vaff[u]) continue;
     K d = vcom[u];
     rakClearScanW(*vcs[t], *vcout[t]);
     rakScanCommunitiesW(*vcs[t], *vcout[t], x, u, vcom);
@@ -331,33 +341,42 @@ inline size_t rakMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vector<vect
 /**
  * Setup and perform the RAK algorithm.
  * @param x original graph
- * @param q initial community each vertex belongs to
  * @param o rak options
- * @param fm marking affected vertices / preprocessing to be performed (vaff)
+ * @param fi initialzing community membership (vcom)
+ * @param fm marking affected vertices (vaff, vcs, vcout, vcom)
+ * @param fa is vertex allowed to be updated? (u)
  * @returns rak result
  */
-template <class FLAG=char, class G, class K, class FM>
-inline RakResult<K> rakInvoke(const G& x, const vector<K>* q, const RakOptions& o, FM fm) {
+template <bool DYNAMIC=false, class FLAG=char, class G, class FI, class FM, class FA>
+inline auto rakInvoke(const G& x, const RakOptions& o, FI fi, FM fm, FA fa) {
+  using K = typename G::key_type;
   using V = typename G::edge_value_type;
   using W = RAK_WEIGHT_TYPE;
   using F = FLAG;
   int l = 0;
+  // Get graph properties.
   size_t S = x.span();
   size_t N = x.order();
-  vector<K> vcom(S), vcs;
-  vector<W> vcout(S);
-  vector<F> vaff(S);
-  float tm = 0;
+  // Allocate buffers.
+  vector<F> vaff(S);   // Affected vertex flag
+  vector<K> vcom;      // Community membership
+  vector<K> vcs;       // Hashtable keys
+  vector<W> vcout(S);  // Hashtable values
+  if (!DYNAMIC) vcom.resize(S);
+  // Perform RAK algorithm.
+  float tm = 0, ti = 0;  // Time spent in different phases
   float t  = measureDuration([&]() {
-    tm += measureDuration([&]() { fm(vaff); });
-    if (q) rakInitializeFromW(vcom, x, *q);
-    else   rakInitializeW(vcom, x);
+    // Initialize community membership.
+    ti += measureDuration([&]() { fi(vcom); });
+    // Mark affected vertices.
+    tm += measureDuration([&]() { fm(vaff, vcs, vcout, vcom); });
+    // Perform iterations.
     for (l=0; l<o.maxIterations;) {
-      size_t n = rakMoveIterationW(vcom, vaff, vcs, vcout, x); ++l;
+      size_t n = rakMoveIterationW(vcom, vaff, vcs, vcout, x, fa); ++l;
       if (double(n)/N <= o.tolerance) break;
     }
   }, o.repeat);
-  return {vcom, l, t, tm/o.repeat};
+  return RakResult<K>(vcom, l, t, tm/o.repeat, ti/o.repeat, countValue(vaff, F(1)));
 }
 
 
@@ -365,37 +384,45 @@ inline RakResult<K> rakInvoke(const G& x, const vector<K>* q, const RakOptions& 
 /**
  * Setup and perform the RAK algorithm.
  * @param x original graph
- * @param q initial community each vertex belongs to
  * @param o rak options
- * @param fm marking affected vertices / preprocessing to be performed (vaff)
+ * @param fi initialzing community membership (vcom)
+ * @param fm marking affected vertices (vaff, vcs, vcout, vcom)
+ * @param fa is vertex allowed to be updated? (u)
  * @returns rak result
  */
-template <class FLAG=char, class G, class K, class FM>
-inline RakResult<K> rakInvokeOmp(const G& x, const vector<K>* q, const RakOptions& o, FM fm) {
+template <bool DYNAMIC=false, class FLAG=char, class G, class FI, class FM, class FA>
+inline auto rakInvokeOmp(const G& x, const RakOptions& o, FI fi, FM fm, FA fa) {
+  using K = typename G::key_type;
   using V = typename G::edge_value_type;
   using W = RAK_WEIGHT_TYPE;
   using F = FLAG;
   int l = 0;
   int T = omp_get_max_threads();
+  // Get graph properties.
   size_t S = x.span();
   size_t N = x.order();
-  vector<K> vcom(S);
-  vector<F> vaff(S);
-  vector<vector<K>*> vcs(T);
-  vector<vector<W>*> vcout(T);
+  // Allocate buffers.
+  vector<F> vaff(S);  // Affected vertex flag
+  vector<K> vcom;     // Community membership
+  vector<vector<K>*> vcs(T);    // Hashtable keys
+  vector<vector<W>*> vcout(T);  // Hashtable values
+  if (!DYNAMIC) vcom.resize(S);
   rakAllocateHashtablesW(vcs, vcout, S);
-  float tm = 0;
+  // Perform RAK algorithm.
+  float tm = 0, ti = 0;  // Time spent in different phases
   float t  = measureDuration([&]() {
-    tm += measureDuration([&]() { fm(vaff); });
-    if (q) rakInitializeFromOmpW(vcom, x, *q);
-    else   rakInitializeOmpW(vcom, x);
+    // Initialize community membership.
+    ti += measureDuration([&]() { fi(vcom); });
+    // Mark affected vertices.
+    tm += measureDuration([&]() { fm(vaff, vcs, vcout, vcom); });
+    // Perform iterations.
     for (l=0; l<o.maxIterations;) {
-      size_t n = rakMoveIterationOmpW(vcom, vaff, vcs, vcout, x); ++l;
+      size_t n = rakMoveIterationOmpW(vcom, vaff, vcs, vcout, x, fa); ++l;
       if (double(n)/N <= o.tolerance) break;
     }
   }, o.repeat);
   rakFreeHashtablesW(vcs, vcout);
-  return {vcom, l, t, tm/o.repeat};
+  return RakResult<K>(vcom, l, t, tm/o.repeat, ti/o.repeat, countValueOmp(vaff, F(1)));
 }
 #endif
 #pragma endregion
@@ -403,33 +430,272 @@ inline RakResult<K> rakInvokeOmp(const G& x, const vector<K>* q, const RakOption
 
 
 
-#pragma region STATIC/NAIVE-DYNAMIC
+#pragma region REPEAT SETUP (DYNAMIC)
 /**
- * Obtain the community membership of each vertex with Static/Naive-dynamic RAK.
+ * Setup the Dynamic RAK algorithm for multiple runs.
+ * @param qs initial community membership for each run (updated)
+ * @param q initial community membership
+ * @param repeat number of runs
+ */
+template <class K>
+inline void rakSetupInitialsW(vector2d<K>& qs, const vector<K>& q, int repeat) {
+  qs.resize(repeat);
+  for (int r=0; r<repeat; ++r)
+    qs[r] = q;
+}
+#pragma endregion
+
+
+
+
+#pragma region STATIC
+/**
+ * Obtain the community membership of each vertex with Static RAK.
  * @param x original graph
- * @param q initial community each vertex belongs to
  * @param o rak options
  * @returns rak result
  */
-template <class FLAG=char, class G, class K>
-inline RakResult<K> rakStatic(const G& x, const vector<K>* q=nullptr, const RakOptions& o={}) {
-  auto fm = [](auto& vaff) { fillValueU(vaff, FLAG(1)); };
-  return rakInvoke<FLAG>(x, q, o, fm);
+template <class FLAG=char, class G>
+inline auto rakStatic(const G& x, const RakOptions& o={}) {
+  auto fi = [&](auto& vcom) { rakInitializeW(vcom, x); };
+  auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) { fillValueU(vaff, FLAG(1)); };
+  auto fa = [ ](auto u) { return true; };
+  return rakInvoke<false, FLAG>(x, o, fi, fm, fa);
 }
 
 
 #ifdef OPENMP
 /**
- * Obtain the community membership of each vertex with Static/Naive-dynamic RAK.
+ * Obtain the community membership of each vertex with Static RAK.
  * @param x original graph
+ * @param o rak options
+ * @returns rak result
+ */
+template <class FLAG=char, class G>
+inline auto rakStaticOmp(const G& x, const RakOptions& o={}) {
+  auto fi = [&](auto& vcom) { rakInitializeOmpW(vcom, x); };
+  auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) { fillValueOmpU(vaff, FLAG(1)); };
+  auto fa = [ ](auto u) { return true; };
+  return rakInvokeOmp<false, FLAG>(x, o, fi, fm, fa);
+}
+#endif
+#pragma endregion
+
+
+
+
+#pragma region NAIVE-DYNAMIC
+/**
+ * Obtain the community membership of each vertex with Naive-dynamic RAK.
+ * @param y updated graph
  * @param q initial community each vertex belongs to
  * @param o rak options
  * @returns rak result
  */
 template <class FLAG=char, class G, class K>
-inline RakResult<K> rakStaticOmp(const G& x, const vector<K>* q=nullptr, const RakOptions& o={}) {
-  auto fm = [](auto& vaff) { fillValueOmpU(vaff, FLAG(1)); };
-  return rakInvokeOmp<FLAG>(x, q, o, fm);
+inline RakResult<K> rakNaiveDynamic(const G& y, const vector<K>& q, const RakOptions& o={}) {
+  vector2d<K> qs;
+  rakSetupInitialsW(qs, q, o.repeat);
+  int  r  = 0;
+  auto fi = [&](auto& vcom) { vcom = move(qs[r]); ++r; };
+  auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) { fillValueU(vaff, FLAG(1)); };
+  auto fa = [ ](auto u) { return true; };
+  return rakInvoke<true, FLAG>(y, o, fi, fm, fa);
+}
+
+
+#ifdef OPENMP
+/**
+ * Obtain the community membership of each vertex with Naive-dynamic RAK.
+ * @param y updated graph
+ * @param q initial community each vertex belongs to
+ * @param o rak options
+ * @returns rak result
+ */
+template <class FLAG=char, class G, class K>
+inline RakResult<K> rakNaiveDynamicOmp(const G& y, const vector<K>& q, const RakOptions& o={}) {
+  vector2d<K> qs;
+  rakSetupInitialsW(qs, q, o.repeat);
+  int  r  = 0;
+  auto fi = [&](auto& vcom) { vcom = move(qs[r]); ++r; };
+  auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) { fillValueOmpU(vaff, FLAG(1)); };
+  auto fa = [ ](auto u) { return true; };
+  return rakInvokeOmp<true, FLAG>(y, o, fi, fm, fa);
+}
+#endif
+#pragma endregion
+
+
+
+
+#pragma region DYNAMIC DELTA-SCREENING
+/**
+ * Find the vertices which should be processed upon a batch of edge insertions and deletions.
+ * @param vertices vertex affected flags (output)
+ * @param neighbors neighbor affected flags (output)
+ * @param communities community affected flags (output)
+ * @param vcs communities vertex u is linked to (temporary buffer, updated)
+ * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
+ * @param y updated graph
+ * @param deletions edge deletions for this batch update (undirected, sorted by source vertex id)
+ * @param insertions edge insertions for this batch update (undirected, sorted by source vertex id)
+ * @param vcom community each vertex belongs to
+ * @returns flags for each vertex marking whether it is affected
+ */
+template <class B, class G, class K, class V, class W>
+inline void rakAffectedVerticesDeltaScreeningW(vector<B>& vertices, vector<B>& neighbors, vector<B>& communities, vector<K>& vcs, vector<W>& vcout, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
+  fillValueU(vertices,    B());
+  fillValueU(neighbors,   B());
+  fillValueU(communities, B());
+  for (const auto& [u, v, w] : deletions) {
+    if (vcom[u] != vcom[v]) continue;
+    vertices[u]  = 1;
+    neighbors[u] = 1;
+    communities[vcom[v]] = 1;
+  }
+  for (size_t i=0; i<insertions.size();) {
+    K u = get<0>(insertions[i]);
+    rakClearScanW(vcs, vcout);
+    for (; i<insertions.size() && get<0>(insertions[i])==u; ++i) {
+      K v = get<1>(insertions[i]);
+      V w = get<2>(insertions[i]);
+      if (vcom[u] == vcom[v]) continue;
+      rakScanCommunityU(vcs, vcout, u, v, w, vcom);
+    }
+    auto [c, w] = rakChooseCommunity(y, u, vcom, vcs, vcout);
+    if (w<=0 || c==vcom[u]) continue;
+    vertices[u]  = 1;
+    neighbors[u] = 1;
+    communities[c] = 1;
+  }
+  y.forEachVertexKey([&](auto u) {
+    if (neighbors[u]) y.forEachEdgeKey(u, [&](auto v) { vertices[v] = 1; });
+    if (communities[vcom[u]]) vertices[u] = 1;
+  });
+}
+
+
+#ifdef OPENMP
+/**
+ * Find the vertices which should be processed upon a batch of edge insertions and deletions.
+ * @param vertices vertex affected flags (output)
+ * @param neighbors neighbor affected flags (output)
+ * @param communities community affected flags (output)
+ * @param vcs communities vertex u is linked to (temporary buffer, updated)
+ * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
+ * @param y updated graph
+ * @param deletions edge deletions for this batch update (undirected, sorted by source vertex id)
+ * @param insertions edge insertions for this batch update (undirected, sorted by source vertex id)
+ * @param vcom community each vertex belongs to
+ * @returns flags for each vertex marking whether it is affected
+ */
+template <class B, class G, class K, class V, class W>
+inline void rakAffectedVerticesDeltaScreeningOmpW(vector<B>& vertices, vector<B>& neighbors, vector<B>& communities, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
+  size_t S = y.span();
+  size_t D = deletions.size();
+  size_t I = insertions.size();
+  fillValueOmpU(vertices,    B());
+  fillValueOmpU(neighbors,   B());
+  fillValueOmpU(communities, B());
+  #pragma omp parallel for schedule(auto)
+  for (size_t i=0; i<D; ++i) {
+    K u = get<0>(deletions[i]);
+    K v = get<1>(deletions[i]);
+    if (vcom[u] != vcom[v]) continue;
+    vertices[u]  = 1;
+    neighbors[u] = 1;
+    communities[vcom[v]] = 1;
+  }
+  #pragma omp parallel
+  {
+    int T = omp_get_num_threads();
+    int t = omp_get_thread_num();
+    K  u0 = I>0? get<0>(insertions[0]) : 0;
+    for (size_t i=0, n=0; i<I;) {
+      K u = get<0>(insertions[i]);
+      if (u!=u0) { ++n; u0 = u; }
+      if (n % T != t) { ++i; continue; }
+      rakClearScanW(*vcs[t], *vcout[t]);
+      for (; i<I && get<0>(insertions[i])==u; ++i) {
+        K v = get<1>(insertions[i]);
+        V w = get<2>(insertions[i]);
+        if (vcom[u] == vcom[v]) continue;
+        rakScanCommunityU(*vcs[t], *vcout[t], u, v, w, vcom);
+      }
+      auto [c, w] = rakChooseCommunity(y, u, vcom, *vcs[t], *vcout[t]);
+      if (w<=0 || c==vcom[u]) continue;
+      vertices[u]  = 1;
+      neighbors[u] = 1;
+      communities[c] = 1;
+    }
+  }
+  #pragma omp parallel for schedule(auto)
+  for (K u=0; u<S; ++u) {
+    if (!y.hasVertex(u)) continue;
+    if (neighbors[u]) y.forEachEdgeKey(u, [&](auto v) { vertices[v] = 1; });
+    if (communities[vcom[u]]) vertices[u] = 1;
+  }
+}
+#endif
+
+
+
+
+/**
+ * Obtain the community membership of each vertex with Dynamic Delta-screening RAK.
+ * @param y updated graph
+ * @param deletions edge deletions in batch update
+ * @param insertions edge insertions in batch update
+ * @param q initial community each vertex belongs to
+ * @param o rak options
+ * @returns rak result
+ */
+template <class FLAG=char, class G, class K, class V>
+inline RakResult<K> rakDynamicDeltaScreening(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const RakOptions& o={}) {
+  using  W = RAK_WEIGHT_TYPE;
+  using  B = FLAG;
+  size_t S = y.span();
+  vector<B> vertices(S), neighbors(S), communities(S);
+  vector2d<K> qs;
+  rakSetupInitialsW(qs, q, o.repeat);
+  int  r  = 0;
+  auto fi = [&](auto& vcom) { vcom = move(qs[r]); ++r; };
+  auto fm = [&](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) {
+    rakAffectedVerticesDeltaScreeningW(vertices, neighbors, communities, vcs, vcout, y, deletions, insertions, vcom);
+    copyValuesW(vaff, vertices);
+  };
+  auto fa = [&](auto u) { return vertices[u]==B(1); };
+  return rakInvoke<true, FLAG>(y, o, fi, fm, fa);
+}
+
+
+#ifdef OPENMP
+/**
+ * Obtain the community membership of each vertex with Dynamic Delta-screening RAK.
+ * @param y updated graph
+ * @param deletions edge deletions in batch update
+ * @param insertions edge insertions in batch update
+ * @param q initial community each vertex belongs to
+ * @param o rak options
+ * @returns rak result
+ */
+template <class FLAG=char, class G, class K, class V>
+inline RakResult<K> rakDynamicDeltaScreeningOmp(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const RakOptions& o={}) {
+  using  W = RAK_WEIGHT_TYPE;
+  using  B = FLAG;
+  size_t S = y.span();
+  int    T = omp_get_max_threads();
+  vector<B> vertices(S), neighbors(S), communities(S);
+  vector2d<K> qs;
+  rakSetupInitialsW(qs, q, o.repeat);
+  int  r  = 0;
+  auto fi = [&](auto& vcom) { vcom = move(qs[r]); ++r; };
+  auto fm = [&](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) {
+    rakAffectedVerticesDeltaScreeningOmpW(vertices, neighbors, communities, vcs, vcout, y, deletions, insertions, vcom);
+    copyValuesOmpW(vaff, vertices);
+  };
+  auto fa = [&](auto u) { return vertices[u]==B(1); };
+  return rakInvokeOmp<true, FLAG>(y, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
@@ -446,10 +712,10 @@ inline RakResult<K> rakStaticOmp(const G& x, const vector<K>* q=nullptr, const R
  * @param insertions edge insertions for this batch update (undirected)
  * @param vcom community each vertex belongs to
  */
-template <class G, class K, class V, class F>
-inline void rakAffectedVerticesFrontierW(vector<F>& vertices, const G& x, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
-  fillValueU(vertices, F());
-  for (const auto& [u, v] : deletions) {
+template <class B, class G, class K, class V>
+inline void rakAffectedVerticesFrontierW(vector<B>& vertices, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
+  fillValueU(vertices, B());
+  for (const auto& [u, v, w] : deletions) {
     if (vcom[u] != vcom[v]) continue;
     vertices[u]  = 1;
   }
@@ -468,10 +734,11 @@ inline void rakAffectedVerticesFrontierW(vector<F>& vertices, const G& x, const 
  * @param deletions edge deletions for this batch update (undirected)
  * @param insertions edge insertions for this batch update (undirected)
  * @param vcom community each vertex belongs to
+ * @returns flags for each vertex marking whether it is affected
  */
-template <class G, class K, class V, class F>
-inline void rakAffectedVerticesFrontierOmpW(vector<F>& vertices, const G& x, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
-  fillValueOmpU(vertices, F());
+template <class B, class G, class K, class V>
+inline void rakAffectedVerticesFrontierOmpW(vector<B>& vertices, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& vcom) {
+  fillValueOmpU(vertices, B());
   size_t D = deletions.size();
   size_t I = insertions.size();
   #pragma omp parallel for schedule(auto)
@@ -504,9 +771,16 @@ inline void rakAffectedVerticesFrontierOmpW(vector<F>& vertices, const G& x, con
  * @returns rak result
  */
 template <class FLAG=char, class G, class K, class V>
-inline RakResult<K> rakDynamicFrontier(const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>* q, const RakOptions& o={}) {
-  auto fm = [&](auto& vaff) { rakAffectedVerticesFrontierW(vaff, y, deletions, insertions, *q); };
-  return rakInvoke<FLAG>(y, q, o, fm);
+inline auto rakDynamicFrontier(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const RakOptions& o={}) {
+  vector2d<K> qs;
+  rakSetupInitialsW(qs, q, o.repeat);
+  int  r  = 0;
+  auto fi = [&](auto& vcom) { vcom = move(qs[r]); ++r; };
+  auto fm = [&](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) {
+    rakAffectedVerticesFrontierW(vaff, y, deletions, insertions, vcom);
+  };
+  auto fa = [ ](auto u) { return true; };
+  return rakInvoke<true, FLAG>(y, o, fi, fm, fa);
 }
 
 
@@ -521,9 +795,16 @@ inline RakResult<K> rakDynamicFrontier(const G& y, const vector<tuple<K, K>>& de
  * @returns rak result
  */
 template <class FLAG=char, class G, class K, class V>
-inline RakResult<K> rakDynamicFrontierOmp(const G& y, const vector<tuple<K, K>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>* q, const RakOptions& o={}) {
-  auto fm = [&](auto& vaff) { rakAffectedVerticesFrontierOmpW(vaff, y, deletions, insertions, *q); };
-  return rakInvokeOmp<FLAG>(y, q, o, fm);
+inline auto rakDynamicFrontierOmp(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const RakOptions& o={}) {
+  vector2d<K> qs;
+  rakSetupInitialsW(qs, q, o.repeat);
+  int  r  = 0;
+  auto fi = [&](auto& vcom) { vcom = move(qs[r]); ++r; };
+  auto fm = [&](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) {
+    rakAffectedVerticesFrontierOmpW(vaff, y, deletions, insertions, vcom);
+  };
+  auto fa = [ ](auto u) { return true; };
+  return rakInvokeOmp<true, FLAG>(y, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
