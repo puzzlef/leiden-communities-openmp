@@ -24,7 +24,7 @@ using namespace std;
 #endif
 #ifndef REPEAT_METHOD
 /** Number of times to repeat each method. */
-#define REPEAT_METHOD 1
+#define REPEAT_METHOD 5
 #endif
 #pragma endregion
 
