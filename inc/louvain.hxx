@@ -1052,9 +1052,9 @@ inline auto louvainInvoke(const G& x, const LouvainOptions& o, FI fi, FM fm, FA 
     // Time the algorithm.
     mark([&]() {
       // Initialize community membership and total vertex/community weights.
-      ti += measureDuration([&]() { fi(vcom, vtot, ctot); });
+      ti += measureDuration([&]() { fi(ucom, utot, ctot); });
       // Mark affected vertices.
-      tm += measureDuration([&]() { fm(vaff, vcs, vcout, vcom, vtot, ctot); });
+      tm += measureDuration([&]() { fm(vaff, vcs, vcout, ucom, utot, ctot); });
       // Start timing first pass.
       auto t0 = timeNow(), t1 = t0;
       // Start local-moving, aggregation phases.
@@ -1168,7 +1168,7 @@ inline auto louvainInvokeOmp(const G& x, const LouvainOptions& o, FI fi, FM fm, 
       // Initialize community membership and total vertex/community weights.
       ti += measureDuration([&]() { fi(ucom, utot, ctot); });
       // Mark affected vertices.
-      tm += measureDuration([&]() { fm(vaff, vcs, vcout, vcom, vtot, ctot); });
+      tm += measureDuration([&]() { fm(vaff, vcs, vcout, ucom, utot, ctot); });
       // Start timing first pass.
       auto t0 = timeNow(), t1 = t0;
       // Start local-moving, aggregation phases.
