@@ -99,6 +99,8 @@ struct LeidenResult {
   float firstPassTime;
   /** Time spent in milliseconds in local-moving phase. */
   float localMoveTime;
+  /** Time spent in milliseconds in refinement phase. */
+  float refinementTime;
   /** Time spent in milliseconds in aggregation phase. */
   float aggregationTime;
   /** Number of vertices initially marked as affected. */
@@ -1219,16 +1221,16 @@ inline auto leidenInvoke(RND& rnd, const G& x, const LeidenOptions& o, FI fi, FM
         if (isFirst) CN = leidenCommunityExistsW(cv.degrees, x, ucom);
         else         CN = leidenCommunityExistsW(cv.degrees, y, vcom);
         if (double(CN)/GN >= o.aggregationTolerance) break;
-        if (isFirst) leidenRenumberCommunitiesW(ucom, cv.degrees, bufk, x);
-        else         leidenRenumberCommunitiesW(vcom, cv.degrees, bufk, y);
+        if (isFirst) leidenRenumberCommunitiesW(ucom, cv.degrees, x);
+        else         leidenRenumberCommunitiesW(vcom, cv.degrees, y);
         if (isFirst) {}
         else         leidenLookupCommunitiesU(ucom, vcom);
         cv.respan(CN); z.respan(CN);
-        if (isFirst) leidenCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, x, ucom);
-        else         leidenCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, y, vcom);
+        if (isFirst) leidenCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, x, ucom);
+        else         leidenCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, y, vcom);
         ta += measureDuration([&]() {
-          if (isFirst) leidenAggregateW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys);
-          else         leidenAggregateW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys);
+          if (isFirst) leidenAggregateW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys);
+          else         leidenAggregateW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys);
         });
         swap(y, z);
         // fillValueU(vcob.data(), CN, K());
@@ -1262,7 +1264,7 @@ inline auto leidenInvoke(RND& rnd, const G& x, const LeidenOptions& o, FI fi, FM
  * @param fa is vertex allowed to be updated? (u)
  * @returns leiden result
  */
-template <bool RANDOM=false, class FLAG=char, class RND, class G, class FI, class FM, class FA>
+template <bool DYNAMIC=false, bool RANDOM=false, class FLAG=char, class RND, class G, class FI, class FM, class FA>
 inline auto leidenInvokeOmp(RND& rnd, const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
   using  W = LEIDEN_WEIGHT_TYPE;
@@ -1417,12 +1419,13 @@ inline void leidenSetupInitialsW(vector2d<K>& qs, vector2d<W>& qvtots, vector2d<
 #pragma region STATIC APPROACH
 /**
  * Obtain the community membership of each vertex with Static Leiden.
+ * @param rnd random number generator
  * @param x original graph
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G>
-inline auto leidenStatic(const G& x, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G>
+inline auto leidenStatic(RND& rnd, const G& x, const LeidenOptions& o={}) {
   auto fi = [&](auto& vcom, auto& vtot, auto& ctot)  {
     leidenVertexWeightsW(vtot, x);
     leidenInitializeW(vcom, ctot, x, vtot);
@@ -1431,19 +1434,20 @@ inline auto leidenStatic(const G& x, const LeidenOptions& o={}) {
     fillValueU(vaff, FLAG(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvoke<false, FLAG>(x, o, fi, fm, fa);
+  return leidenInvoke<false, RANDOM, FLAG>(rnd, x, o, fi, fm, fa);
 }
 
 
 #ifdef OPENMP
 /**
  * Obtain the community membership of each vertex with Static Leiden.
+ * @param rnd random number generator
  * @param x original graph
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G>
-inline auto leidenStaticOmp(const G& x, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G>
+inline auto leidenStaticOmp(RND& rnd, const G& x, const LeidenOptions& o={}) {
   auto fi = [&](auto& vcom, auto& vtot, auto& ctot)  {
     leidenVertexWeightsOmpW(vtot, x);
     leidenInitializeOmpW(vcom, ctot, x, vtot);
@@ -1452,7 +1456,7 @@ inline auto leidenStaticOmp(const G& x, const LeidenOptions& o={}) {
     fillValueOmpU(vaff, FLAG(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvokeOmp<false, FLAG>(x, o, fi, fm, fa);
+  return leidenInvokeOmp<false, RANDOM, FLAG>(rnd, x, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
@@ -1463,6 +1467,7 @@ inline auto leidenStaticOmp(const G& x, const LeidenOptions& o={}) {
 #pragma region NAIVE-DYNAMIC APPROACH
 /**
  * Obtain the community membership of each vertex with Naive-dynamic Leiden.
+ * @param rnd random number generator
  * @param y updated graph
  * @param deletions edge deletions for this batch update (undirected)
  * @param insertions edge insertions for this batch update (undirected)
@@ -1472,8 +1477,8 @@ inline auto leidenStaticOmp(const G& x, const LeidenOptions& o={}) {
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G, class K, class V, class W>
-inline auto leidenNaiveDynamic(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class V, class W>
+inline auto leidenNaiveDynamic(RND& rnd, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
   vector2d<K> qs;
   vector2d<W> qvtots, qctots;
   leidenSetupInitialsW(qs, qvtots, qctots, q, qvtot, qctot, o.repeat);
@@ -1488,13 +1493,14 @@ inline auto leidenNaiveDynamic(const G& y, const vector<tuple<K, K, V>>& deletio
     fillValueU(vaff, FLAG(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvoke<true, FLAG>(y, o, fi, fm, fa);
+  return leidenInvoke<true, RANDOM, FLAG>(rnd, y, o, fi, fm, fa);
 }
 
 
 #ifdef OPENMP
 /**
  * Obtain the community membership of each vertex with Naive-dynamic Leiden.
+ * @param rnd random number generator
  * @param y updated graph
  * @param deletions edge deletions for this batch update (undirected)
  * @param insertions edge insertions for this batch update (undirected)
@@ -1504,8 +1510,8 @@ inline auto leidenNaiveDynamic(const G& y, const vector<tuple<K, K, V>>& deletio
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G, class K, class V, class W>
-inline auto leidenNaiveDynamicOmp(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class V, class W>
+inline auto leidenNaiveDynamicOmp(RND& rnd, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
   vector2d<K> qs;
   vector2d<W> qvtots, qctots;
   leidenSetupInitialsW(qs, qvtots, qctots, q, qvtot, qctot, o.repeat);
@@ -1520,7 +1526,7 @@ inline auto leidenNaiveDynamicOmp(const G& y, const vector<tuple<K, K, V>>& dele
     fillValueOmpU(vaff, FLAG(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvokeOmp<true, FLAG>(y, o, fi, fm, fa);
+  return leidenInvokeOmp<true, RANDOM, FLAG>(rnd, y, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
@@ -1649,6 +1655,7 @@ inline auto leidenAffectedVerticesDeltaScreeningOmpW(vector<B>& vertices, vector
 
 /**
  * Obtain the community membership of each vertex with Dynamic Delta-screening Leiden.
+ * @param rnd random number generator
  * @param y updated graph
  * @param deletions edge deletions in batch update (undirected, sorted by source vertex id)
  * @param insertions edge insertions in batch update (undirected, sorted by source vertex id)
@@ -1658,8 +1665,8 @@ inline auto leidenAffectedVerticesDeltaScreeningOmpW(vector<B>& vertices, vector
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G, class K, class V, class W>
-inline auto leidenDynamicDeltaScreening(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class V, class W>
+inline auto leidenDynamicDeltaScreening(RND& rnd, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
   using  B = FLAG;
   size_t S = y.span();
   double R = o.resolution;
@@ -1680,13 +1687,14 @@ inline auto leidenDynamicDeltaScreening(const G& y, const vector<tuple<K, K, V>>
     copyValuesW(vaff, vertices);
   };
   auto fa = [&](auto u) { return vertices[u] == B(1); };
-  return leidenInvoke<true, FLAG>(y, o, fi, fm, fa);
+  return leidenInvoke<true, RANDOM, FLAG>(rnd, y, o, fi, fm, fa);
 }
 
 
 #ifdef OPENMP
 /**
  * Obtain the community membership of each vertex with Dynamic Delta-screening Leiden.
+ * @param rnd random number generator
  * @param y updated graph
  * @param deletions edge deletions in batch update
  * @param insertions edge insertions in batch update
@@ -1696,8 +1704,8 @@ inline auto leidenDynamicDeltaScreening(const G& y, const vector<tuple<K, K, V>>
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G, class K, class V, class W>
-inline auto leidenDynamicDeltaScreeningOmp(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class V, class W>
+inline auto leidenDynamicDeltaScreeningOmp(RND& rnd, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
   using  B = FLAG;
   size_t S = y.span();
   double R = o.resolution;
@@ -1719,7 +1727,7 @@ inline auto leidenDynamicDeltaScreeningOmp(const G& y, const vector<tuple<K, K, 
     copyValuesOmpW(vaff, vertices);
   };
   auto fa = [&](auto u) { return vertices[u] == B(1); };
-  return leidenInvokeOmp<true, FLAG>(y, o, fi, fm, fa);
+  return leidenInvokeOmp<true, RANDOM, FLAG>(rnd, y, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
@@ -1787,6 +1795,7 @@ inline void leidenAffectedVerticesFrontierOmpW(vector<B>& vertices, const G& y, 
 
 /**
  * Obtain the community membership of each vertex with Dynamic Frontier Leiden.
+ * @param rnd random number generator
  * @param y updated graph
  * @param deletions edge deletions in batch update
  * @param insertions edge insertions in batch update
@@ -1796,8 +1805,8 @@ inline void leidenAffectedVerticesFrontierOmpW(vector<B>& vertices, const G& y, 
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G, class K, class V, class W>
-inline auto leidenDynamicFrontier(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class V, class W>
+inline auto leidenDynamicFrontier(RND& rnd, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
   vector2d<K> qs;
   vector2d<W> qvtots, qctots;
   leidenSetupInitialsW(qs, qvtots, qctots, q, qvtot, qctot, o.repeat);
@@ -1812,13 +1821,14 @@ inline auto leidenDynamicFrontier(const G& y, const vector<tuple<K, K, V>>& dele
     leidenAffectedVerticesFrontierW(vaff, y, deletions, insertions, vcom);
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvoke<true, FLAG>(y, o, fi, fm, fa);
+  return leidenInvoke<true, RANDOM, FLAG>(rnd, y, o, fi, fm, fa);
 }
 
 
 #ifdef OPENMP
 /**
  * Obtain the community membership of each vertex with Dynamic Frontier Leiden.
+ * @param rnd random number generator
  * @param y updated graph
  * @param deletions edge deletions in batch update
  * @param insertions edge insertions in batch update
@@ -1828,8 +1838,8 @@ inline auto leidenDynamicFrontier(const G& y, const vector<tuple<K, K, V>>& dele
  * @param o leiden options
  * @returns leiden result
  */
-template <class FLAG=char, class G, class K, class V, class W>
-inline auto leidenDynamicFrontierOmp(const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
+template <bool RANDOM=false, class FLAG=char, class RND, class G, class K, class V, class W>
+inline auto leidenDynamicFrontierOmp(RND& rnd, const G& y, const vector<tuple<K, K, V>>& deletions, const vector<tuple<K, K, V>>& insertions, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const LeidenOptions& o={}) {
   vector2d<K> qs;
   vector2d<W> qvtots, qctots;
   leidenSetupInitialsW(qs, qvtots, qctots, q, qvtot, qctot, o.repeat);
@@ -1844,7 +1854,7 @@ inline auto leidenDynamicFrontierOmp(const G& y, const vector<tuple<K, K, V>>& d
     leidenAffectedVerticesFrontierOmpW(vaff, y, deletions, insertions, vcom);
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvokeOmp<true, FLAG>(y, o, fi, fm, fa);
+  return leidenInvokeOmp<true, RANDOM, FLAG>(rnd, y, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
