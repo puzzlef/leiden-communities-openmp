@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Sahu
+    given-names: Subhajit
+    orcid: https://orcid.org/0000-0001-5140-6578
+title: "puzzlef/leiden-communities-openmp: Design of OpenMP-based Parallel Leiden algorithm for community detection"
+version: 1.0.0
+doi: 10.5281/zenodo.10428322
+date-released: 2023-12-24
