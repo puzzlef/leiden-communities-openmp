@@ -13,3 +13,4 @@
 #include "louvain.hxx"
 #include "leiden.hxx"
 #include "louvainSplit.hxx"
+#include "leidenSplit.hxx"
