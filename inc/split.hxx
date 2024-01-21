@@ -96,12 +96,12 @@ inline void splitDisconnectedCommunitiesDfsOmpW(vector<K>& vcom, vector<atomic<i
  * @param cthd community each thread is working on (scratch)
  * @param vis vertex visited flags (scratch)
  * @param us per-thread start vertices for BFS (scratch)
- * @param vs per-thread prontier vertices for BFS (scratch)
+ * @param vs per-thread frontier vertices for BFS (scratch)
  * @param x given graph
  * @param vdom community each vertex belongs to
  */
 template <class B, class G, class K>
-inline void splitDisconnectedCommunitiesDfsOmpW(vector<K>& vcom, vector<atomic<int>>& cthd, vector<B>& vis, vector<vector<K>*>& us, vector<vector<K>*>& vs, const G& x, const vector<K>& vdom) {
+inline void splitDisconnectedCommunitiesBfsOmpW(vector<K>& vcom, vector<atomic<int>>& cthd, vector<B>& vis, vector<vector<K>*>& us, vector<vector<K>*>& vs, const G& x, const vector<K>& vdom) {
   size_t S = x.span();
   // Initialize each vertex to its own label/subcommunity.
   for (K u=0; u<S; ++u) {
