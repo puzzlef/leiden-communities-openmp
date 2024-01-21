@@ -15,7 +15,7 @@ fi
 # export OMP_STACKSIZE="4G"
 : "${TYPE:=float}"
 : "${MAX_THREADS:=64}"
-: "${REPEAT_METHOD:=5}"
+: "${REPEAT_METHOD:=1}"
 # Define macros (dont forget to add here)
 DEFINES=(""
 "-DTYPE=$TYPE"

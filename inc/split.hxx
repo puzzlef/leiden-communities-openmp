@@ -82,7 +82,11 @@ inline void splitDisconnectedCommunitiesDfsOmpW(vector<K>& vcom, vector<atomic<i
     K c = vcom[u];
     if (!vis[u]) continue;
     if (cthd[d]!=0 && cthd[d]!=t+1) continue;
-    if (cthd[d]==0 && cthd[d].compare_exchange_strong(0, t+1)!=0) continue;
+    if (cthd[d]==0) {
+      int old = 0;
+      cthd[d].compare_exchange_strong(old, t+1);
+      if (old!=0) continue;
+    }
     auto ft = [&](auto v) { return vdom[v]==d; };
     auto fp = [&](auto v) { vcom[v] = c; };
     dfsVisitedForEachU(vis, x, u, ft, fp);
@@ -117,7 +121,11 @@ inline void splitDisconnectedCommunitiesBfsOmpW(vector<K>& vcom, vector<atomic<i
     K c = vcom[u];
     if (!vis[u]) continue;
     if (cthd[d]!=0 && cthd[d]!=t+1) continue;
-    if (cthd[d]==0 && cthd[d].compare_exchange_strong(0, t+1)!=0) continue;
+    if (cthd[d]==0) {
+      int old = 0;
+      cthd[d].compare_exchange_strong(old, t+1);
+      if (old!=0) continue;
+    }
     auto ft = [&](auto v, auto _) { return vdom[v]==d; };
     auto fp = [&](auto v, auto _) { vcom[v] = c; };
     (*us[t]).clear(); (*vs[t]).clear(); (*us[t]).push_back(u);
