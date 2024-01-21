@@ -385,6 +385,7 @@ inline vector<char> communitiesDisconnectedOmp(const G& x, const vector<K>& vcom
   #pragma omp parallel
   {
     for (K u=0; u<S; ++u) {
+      if (!x.hasVertex(u)) continue;
       int t = omp_get_thread_num();
       K   c = vcom[u], reached = K();
       if (coms[c]==0 || !belongsOmp(c)) continue;

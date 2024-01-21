@@ -1,6 +1,5 @@
 #pragma once
 #include <utility>
-#include <atomic>
 #include <vector>
 #include <random>
 #include <algorithm>
@@ -13,7 +12,6 @@
 #include <omp.h>
 #endif
 
-using std::atomic;
 using std::vector;
 using std::swap;
 using std::max;
@@ -69,14 +67,13 @@ inline auto leidenSplitLastInvokeOmp(RND& rnd, const G& x, const LeidenOptions& 
   DiGraphCsr<K, None, W> y(S, Y);         // CSR for aggregated graph (input);  y(S, X)
   DiGraphCsr<K, None, W> z(S, Z);         // CSR for aggregated graph (output); z(S, X)
   // Data structures for splitting disconnected communities.
-  vector<atomic<int>> cthd(T);            // Community each thread is working on
   vector<vector<K>*> us(T), vs(T);        // Per-thread start, frontier vertices for BFS
   if (SPLIT) {
     for (int t=0; t<T; ++t) {
       us[t] = new vector<K>();
       vs[t] = new vector<K>();
-      (*us[t]).reserve(S/T);
-      (*vs[t]).reserve(S/T);
+      (*us[t]).reserve(4*S/T);
+      (*vs[t]).reserve(4*S/T);
     }
   }
   // Perform Leiden algorithm.
@@ -158,10 +155,10 @@ inline auto leidenSplitLastInvokeOmp(RND& rnd, const G& x, const LeidenOptions& 
       if (p<=1) t1 = timeNow();
       tp += duration(t0, t1);
     });
-    if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(vcom, vaff, x, ucom);        swap(ucom, vcom); }
-    else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (vcom, vaff, x, ucom);        swap(ucom, vcom); }
-    else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(vcom, cthd, vaff, x, ucom);         swap(ucom, vcom); }
-    else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(vcom, cthd, vaff, us, vs, x, ucom); swap(ucom, vcom); }
+    if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(vcom, vaff, x, ucom);  swap(ucom, vcom); }
+    else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (vcom, vaff, x, ucom);  swap(ucom, vcom); }
+    else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(vcom, vaff, x, ucom);         swap(ucom, vcom); }
+    else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(vcom, vaff, us, vs, x, ucom); swap(ucom, vcom); }
   }, o.repeat);
   if (SPLIT) {
     for (int t=0; t<T; ++t) {
@@ -222,14 +219,13 @@ inline auto leidenSplitIterationInvokeOmp(RND& rnd, const G& x, const LeidenOpti
   DiGraphCsr<K, None, W> z(S, Z);         // CSR for aggregated graph (output); z(S, X)
   // Data structures for splitting disconnected communities.
   vector<K> tcom(S);                      // Temporary community membership
-  vector<atomic<int>> cthd(T);            // Community each thread is working on
   vector<vector<K>*> us(T), vs(T);        // Per-thread start, frontier vertices for BFS
   if (SPLIT) {
     for (int t=0; t<T; ++t) {
       us[t] = new vector<K>();
       vs[t] = new vector<K>();
-      (*us[t]).reserve(S/T);
-      (*vs[t]).reserve(S/T);
+      (*us[t]).reserve(4*S/T);
+      (*vs[t]).reserve(4*S/T);
     }
   }
   // Perform Leiden algorithm.
@@ -278,16 +274,16 @@ inline auto leidenSplitIterationInvokeOmp(RND& rnd, const G& x, const LeidenOpti
           else         m += leidenMoveOmpW<true, RANDOM>(vcom, ctot, vaff, vcs, vcout, rng, y, vcob, vtot, M, R, L, fc);
         });
         if (isFirst) {
-          if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, x, ucom);        swap(ucom, tcom); }
-          else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, x, ucom);        swap(ucom, tcom); }
-          else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, cthd, vaff, x, ucom);         swap(ucom, tcom); }
-          else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, cthd, vaff, us, vs, x, ucom); swap(ucom, tcom); }
+          if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, x, ucom);  swap(ucom, tcom); }
+          else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, x, ucom);  swap(ucom, tcom); }
+          else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, vaff, x, ucom);         swap(ucom, tcom); }
+          else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, vaff, us, vs, x, ucom); swap(ucom, tcom); }
         }
         else {
-          if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, y, vcom);        swap(vcom, tcom); }
-          else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, y, vcom);        swap(vcom, tcom); }
-          else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, cthd, vaff, y, vcom);         swap(vcom, tcom); }
-          else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, cthd, vaff, us, vs, y, vcom); swap(ucom, tcom); }
+          if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, y, vcom);  swap(vcom, tcom); }
+          else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, y, vcom);  swap(vcom, tcom); }
+          else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, vaff, y, vcom);         swap(vcom, tcom); }
+          else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, vaff, us, vs, y, vcom); swap(vcom, tcom); }
         }
         l += max(m, 1); ++p;
         if (m<=1 || p>=P) break;
