@@ -103,6 +103,8 @@ struct LeidenResult {
   float refinementTime;
   /** Time spent in milliseconds in aggregation phase. */
   float aggregationTime;
+  /** Time spent in milliseconds for splitting disconnected communities. */
+  float splittingTime;
   /** Number of vertices initially marked as affected. */
   size_t affectedVertices;
   #pragma endregion
@@ -123,10 +125,11 @@ struct LeidenResult {
    * @param localMoveTime time spent in milliseconds in local-moving phase
    * @param refinementTime time spent in milliseconds in refinement phase
    * @param aggregationTime time spent in milliseconds in aggregation phase
+   * @param splittingTime time spent in milliseconds for splitting disconnected communities
    * @param affectedVertices number of vertices initially marked as affected
    */
-  LeidenResult(vector<K>&& membership, vector<W>&& vertexWeight, vector<W>&& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float refinementTime=0, float aggregationTime=0, size_t affectedVertices=0) :
-  membership(membership), vertexWeight(vertexWeight), communityWeight(communityWeight), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), refinementTime(refinementTime), aggregationTime(aggregationTime), affectedVertices(affectedVertices) {}
+  LeidenResult(vector<K>&& membership, vector<W>&& vertexWeight, vector<W>&& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float refinementTime=0, float aggregationTime=0, float splittingTime=0, size_t affectedVertices=0) :
+  membership(membership), vertexWeight(vertexWeight), communityWeight(communityWeight), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), refinementTime(refinementTime), aggregationTime(aggregationTime), splittingTime(splittingTime), affectedVertices(affectedVertices) {}
 
 
   /**
@@ -143,10 +146,11 @@ struct LeidenResult {
    * @param localMoveTime time spent in milliseconds in local-moving phase
    * @param refinementTime time spent in milliseconds in refinement phase
    * @param aggregationTime time spent in milliseconds in aggregation phase
+   * @param splittingTime time spent in milliseconds for splitting disconnected communities
    * @param affectedVertices number of vertices initially marked as affected
    */
-  LeidenResult(vector<K>& membership, vector<W>& vertexWeight, vector<W>& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float refinementTime=0, float aggregationTime=0, size_t affectedVertices=0) :
-  membership(move(membership)), vertexWeight(move(vertexWeight)), communityWeight(move(communityWeight)), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), refinementTime(refinementTime), aggregationTime(aggregationTime), affectedVertices(affectedVertices) {}
+  LeidenResult(vector<K>& membership, vector<W>& vertexWeight, vector<W>& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float refinementTime=0, float aggregationTime=0, float splittingTime=0, size_t affectedVertices=0) :
+  membership(move(membership)), vertexWeight(move(vertexWeight)), communityWeight(move(communityWeight)), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), refinementTime(refinementTime), aggregationTime(aggregationTime), splittingTime(splittingTime), affectedVertices(affectedVertices) {}
   #pragma endregion
 };
 #pragma endregion
@@ -1249,7 +1253,7 @@ inline auto leidenInvoke(RND& rnd, const G& x, const LeidenOptions& o, FI fi, FM
     });
   }, o.repeat);
   leidenFreeRngsW(rng);
-  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, countValue(vaff, B(1)));
+  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, 0, countValue(vaff, B(1)));
 }
 
 
@@ -1381,7 +1385,7 @@ inline auto leidenInvokeOmp(RND& rnd, const G& x, const LeidenOptions& o, FI fi,
   }, o.repeat);
   leidenFreeHashtablesW(vcs, vcout);
   leidenFreeRngsW(rng);
-  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, countValueOmp(vaff, B(1)));
+  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, 0, countValueOmp(vaff, B(1)));
 }
 #endif
 #pragma endregion

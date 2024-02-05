@@ -77,7 +77,7 @@ inline auto leidenSplitLastInvokeOmp(RND& rnd, const G& x, const LeidenOptions& 
     }
   }
   // Perform Leiden algorithm.
-  float tm = 0, ti = 0, tp = 0, tl = 0, tr = 0, ta = 0;  // Time spent in different phases
+  float tm = 0, ti = 0, tp = 0, tl = 0, tr = 0, ta = 0, ts = 0;  // Time spent in different phases
   float t  = measureDurationMarked([&](auto mark) {
     double E  = o.tolerance;
     auto   fc = [&](double el, int l) { return el<=E; };
@@ -154,11 +154,13 @@ inline auto leidenSplitLastInvokeOmp(RND& rnd, const G& x, const LeidenOptions& 
       else      leidenLookupCommunitiesOmpU(ucom, vcom);
       if (p<=1) t1 = timeNow();
       tp += duration(t0, t1);
+      ts += measureDuration([&]() {
+        if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(vcom, vaff, x, ucom);  swap(ucom, vcom); }
+        else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (vcom, vaff, x, ucom);  swap(ucom, vcom); }
+        else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(vcom, vaff, x, ucom);         swap(ucom, vcom); }
+        else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(vcom, vaff, us, vs, x, ucom); swap(ucom, vcom); }
+      });
     });
-    if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(vcom, vaff, x, ucom);  swap(ucom, vcom); }
-    else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (vcom, vaff, x, ucom);  swap(ucom, vcom); }
-    else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(vcom, vaff, x, ucom);         swap(ucom, vcom); }
-    else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(vcom, vaff, us, vs, x, ucom); swap(ucom, vcom); }
   }, o.repeat);
   if (SPLIT) {
     for (int t=0; t<T; ++t) {
@@ -168,7 +170,7 @@ inline auto leidenSplitLastInvokeOmp(RND& rnd, const G& x, const LeidenOptions& 
   }
   leidenFreeHashtablesW(vcs, vcout);
   leidenFreeRngsW(rng);
-  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, countValueOmp(vaff, B(1)));
+  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, ts/o.repeat, countValueOmp(vaff, B(1)));
 }
 
 
@@ -229,7 +231,7 @@ inline auto leidenSplitIterationInvokeOmp(RND& rnd, const G& x, const LeidenOpti
     }
   }
   // Perform Leiden algorithm.
-  float tm = 0, ti = 0, tp = 0, tl = 0, tr = 0, ta = 0;  // Time spent in different phases
+  float tm = 0, ti = 0, tp = 0, tl = 0, tr = 0, ta = 0, ts = 0;  // Time spent in different phases
   float t  = measureDurationMarked([&](auto mark) {
     double E  = o.tolerance;
     auto   fc = [&](double el, int l) { return el<=E; };
@@ -273,18 +275,20 @@ inline auto leidenSplitIterationInvokeOmp(RND& rnd, const G& x, const LeidenOpti
           if (isFirst) m += leidenMoveOmpW<true, RANDOM>(ucom, ctot, vaff, vcs, vcout, rng, x, vcob, vtot, M, R, L, fc);
           else         m += leidenMoveOmpW<true, RANDOM>(vcom, ctot, vaff, vcs, vcout, rng, y, vcob, vtot, M, R, L, fc);
         });
-        if (isFirst) {
-          if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, x, ucom);  swap(ucom, tcom); }
-          else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, x, ucom);  swap(ucom, tcom); }
-          else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, vaff, x, ucom);         swap(ucom, tcom); }
-          else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, vaff, us, vs, x, ucom); swap(ucom, tcom); }
-        }
-        else {
-          if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, y, vcom);  swap(vcom, tcom); }
-          else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, y, vcom);  swap(vcom, tcom); }
-          else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, vaff, y, vcom);         swap(vcom, tcom); }
-          else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, vaff, us, vs, y, vcom); swap(vcom, tcom); }
-        }
+        ts += measureDuration([&]() {
+          if (isFirst) {
+            if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, x, ucom);  swap(ucom, tcom); }
+            else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, x, ucom);  swap(ucom, tcom); }
+            else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, vaff, x, ucom);         swap(ucom, tcom); }
+            else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, vaff, us, vs, x, ucom); swap(ucom, tcom); }
+          }
+          else {
+            if (SPLIT==1)      { splitDisconnectedCommunitiesLpaOmpW<false>(tcom, vaff, y, vcom);  swap(vcom, tcom); }
+            else if (SPLIT==2) { splitDisconnectedCommunitiesLpaOmpW<true> (tcom, vaff, y, vcom);  swap(vcom, tcom); }
+            else if (SPLIT==3) { splitDisconnectedCommunitiesDfsOmpW(tcom, vaff, y, vcom);         swap(vcom, tcom); }
+            else if (SPLIT==4) { splitDisconnectedCommunitiesBfsOmpW(tcom, vaff, us, vs, y, vcom); swap(vcom, tcom); }
+          }
+        });
         l += max(m, 1); ++p;
         if (m<=1 || p>=P) break;
         size_t GN = isFirst? x.order() : y.order();
@@ -328,7 +332,7 @@ inline auto leidenSplitIterationInvokeOmp(RND& rnd, const G& x, const LeidenOpti
   }
   leidenFreeHashtablesW(vcs, vcout);
   leidenFreeRngsW(rng);
-  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, countValueOmp(vaff, B(1)));
+  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, ts/o.repeat, countValueOmp(vaff, B(1)));
 }
 #endif
 #pragma endregion

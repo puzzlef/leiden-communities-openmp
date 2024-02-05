@@ -99,6 +99,8 @@ struct LouvainResult {
   float localMoveTime;
   /** Time spent in milliseconds in aggregation phase. */
   float aggregationTime;
+  /** Time spent in milliseconds for splitting disconnected communities. */
+  float splittingTime;
   /** Number of vertices initially marked as affected. */
   size_t affectedVertices;
   #pragma endregion
@@ -118,10 +120,11 @@ struct LouvainResult {
    * @param firstPassTime time spent in milliseconds in first pass
    * @param localMoveTime time spent in milliseconds in local-moving phase
    * @param aggregationTime time spent in milliseconds in aggregation phase
+   * @param splittingTime time spent in milliseconds for splitting disconnected communities
    * @param affectedVertices number of vertices initially marked as affected
    */
-  LouvainResult(vector<K>&& membership, vector<W>&& vertexWeight, vector<W>&& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float aggregationTime=0, size_t affectedVertices=0) :
-  membership(membership), vertexWeight(vertexWeight), communityWeight(communityWeight), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), aggregationTime(aggregationTime), affectedVertices(affectedVertices) {}
+  LouvainResult(vector<K>&& membership, vector<W>&& vertexWeight, vector<W>&& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float aggregationTime=0, float splittingTime=0, size_t affectedVertices=0) :
+  membership(membership), vertexWeight(vertexWeight), communityWeight(communityWeight), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), aggregationTime(aggregationTime), splittingTime(splittingTime), affectedVertices(affectedVertices) {}
 
 
   /**
@@ -137,10 +140,11 @@ struct LouvainResult {
    * @param firstPassTime time spent in milliseconds in first pass
    * @param localMoveTime time spent in milliseconds in local-moving phase
    * @param aggregationTime time spent in milliseconds in aggregation phase
+   * @param splittingTime time spent in milliseconds for splitting disconnected communities
    * @param affectedVertices number of vertices initially marked as affected
    */
-  LouvainResult(vector<K>& membership, vector<W>& vertexWeight, vector<W>& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float aggregationTime=0, size_t affectedVertices=0) :
-  membership(move(membership)), vertexWeight(move(vertexWeight)), communityWeight(move(communityWeight)), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), aggregationTime(aggregationTime), affectedVertices(affectedVertices) {}
+  LouvainResult(vector<K>& membership, vector<W>& vertexWeight, vector<W>& communityWeight, int iterations=0, int passes=0, float time=0, float markingTime=0, float initializationTime=0, float firstPassTime=0, float localMoveTime=0, float aggregationTime=0, float splittingTime=0, size_t affectedVertices=0) :
+  membership(move(membership)), vertexWeight(move(vertexWeight)), communityWeight(move(communityWeight)), iterations(iterations), passes(passes), time(time), markingTime(markingTime), initializationTime(initializationTime), firstPassTime(firstPassTime), localMoveTime(localMoveTime), aggregationTime(aggregationTime), splittingTime(splittingTime), affectedVertices(affectedVertices) {}
   #pragma endregion
 };
 #pragma endregion
@@ -1102,7 +1106,7 @@ inline auto louvainInvoke(const G& x, const LouvainOptions& o, FI fi, FM fm, FA 
       tp += duration(t0, t1);
     });
   }, o.repeat);
-  return LouvainResult<K, W>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, ta/o.repeat, countValue(vaff, B(1)));
+  return LouvainResult<K, W>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, ta/o.repeat, 0, countValue(vaff, B(1)));
 }
 
 
@@ -1217,7 +1221,7 @@ inline auto louvainInvokeOmp(const G& x, const LouvainOptions& o, FI fi, FM fm, 
     });
   }, o.repeat);
   louvainFreeHashtablesW(vcs, vcout);
-  return LouvainResult<K, W>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, ta/o.repeat, countValueOmp(vaff, B(1)));
+  return LouvainResult<K, W>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, ta/o.repeat, 0, countValueOmp(vaff, B(1)));
 }
 #endif
 #pragma endregion
