@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=64
+#SBATCH --exclusive
+#SBATCH --mem=30gb
+#SBATCH --job-name slurm
+#SBATCH --output=slurm.out
+# source scl_source enable gcc-toolset-11
+# module load hpcx-2.7.0/hpcx-ompi
+# module load openmpi/4.1.5
 src="leiden-communities-openmp"
 out="$HOME/Logs/$src$1.log"
 ulimit -s unlimited
