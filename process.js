@@ -5,7 +5,7 @@ const path = require('path');
 const ROMPTH = /^OMP_NUM_THREADS=(\d+)/;
 const RGRAPH = /^Loading graph .*\/(.*?)\.mtx \.\.\./m;
 const RORDER = /^order: (\d+) size: (\d+) (?:\[\w+\] )?\{\}/m;
-const RRESLT = /^\{(.+?)ms, (.+?)ms mark, (.+?)ms init, (.+?)ms firstpass, (.+?)ms locmove, (.+?)ms refine, (.+?)ms aggr, (.+?)ms split, (.+?) aff, (.+?) iters, (.+?) passes, (.+?) modularity, (.+?)\/(.+?) disconnected\} (.+)/m;
+const RRESLT = /^\{(.+?) threads\} -> \{(.+?)ms, (.+?)ms mark, (.+?)ms init, (.+?)ms firstpass, (.+?)ms locmove, (.+?)ms refine, (.+?)ms aggr, (.+?)ms split, (.+?) aff, (.+?) iters, (.+?) passes, (.+?) modularity, (.+?)\/(.+?) disconnected\} (.+)/m;
 
 
 
@@ -60,9 +60,10 @@ function readLogLine(ln, data, state) {
     state.size  = parseFloat(size);
   }
   else if (RRESLT.test(ln)) {
-    var [, time, marking_time, initialization_time, first_pass_time, local_moving_phase_time, refinement_phase_time, aggregation_phase_time, splitting_time, affected_vertices, iterations, passes, modularity, disconnected_communities, total_communities, technique] = RRESLT.exec(ln);
+    var [, num_threads, time, marking_time, initialization_time, first_pass_time, local_moving_phase_time, refinement_phase_time, aggregation_phase_time, splitting_time, affected_vertices, iterations, passes, modularity, disconnected_communities, total_communities, technique] = RRESLT.exec(ln);
     data.get(state.graph).push(Object.assign({}, state, {
-      time:        parseFloat(time),
+      num_threads:             parseFloat(num_threads),
+      time:                    parseFloat(time),
       marking_time:            parseFloat(marking_time),
       initialization_time:     parseFloat(initialization_time),
       first_pass_time:         parseFloat(first_pass_time),
