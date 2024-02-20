@@ -1,31 +1,34 @@
-Design of OpenMP-based [Leiden algorithm] for [community detection].
+Design of OpenMP-based Parallel [Leiden algorithm][Leiden] for [community detection], \
+that prevents internally disconnected communities.
 
-Community detection involves identifying subsets of vertices that display higher connectivity within themselves than with the rest of the network. The widely used Louvain method, a heuristic-based approach for community detection, employs a two-phase process consisting of a local-moving phase and an aggregation phase. This iterative optimization targets the modularity metric, a measure of community quality. Despite its popularity, the Louvain method has been observed to generate internally-disconnected and poorly connected communities. In response to these limitations, Traag et al. propose the Leiden algorithm, which introduces a refinement phase between the local-moving and aggregation phases. This refinement phase allows vertices to explore and potentially form sub-communities within the identified communities from the local-moving phase, enabling the Leiden algorithm to identify well-connected communities.
+> [!NOTE]
+> For the code of [GVE-Leiden][report1], refer to the [arXiv-2312.13936] branch.
 
-Nevertheless, the original Leiden algorithm encounters computational bottlenecks when applied to massive graphs, primarily due to its inherently sequential nature, akin to the Louvain method. In scenarios where scalability is crucial, the development of an optimized parallel Leiden algorithm becomes essential, especially in the multicore/shared memory setting, given its energy efficiency and the prevalence of hardware with large memory sizes. Despite existing studies proposing various parallelization techniques for the Leiden algorithm, they do not address optimization for the aggregation phase, which emerges as a bottleneck after optimizing the local-moving phase. Additionally, several optimization techniques applicable to the Louvain method are also relevant to the Leiden algorithm. To tackle these challenges, we present **GVE-Leiden**, an optimized *parallel implementation of the Leiden algorithm* designed for shared memory multicores.
+<br>
 
-Below we plot the time taken by the [original Leiden], [igraph] Leiden, [NetworKit] Leiden, and GVE-Leiden on 13 different graphs. GVE-Leiden surpasses the original Leiden, igraph Leiden, and NetworKit Leiden by `373×`, `86×`, and `7.2×` respectively, achieving a processing rate of `1.4𝐵` edges/s on a `3.8𝐵` edge graph.
+Community detection entails the identification of clusters of vertices that exhibit stronger connections within themselves compared to the wider network. The Louvain method, a commonly utilized heuristic for this task, employs a two-step process comprising a local-moving phase and an aggregation phase. This process iteratively optimizes the modularity metric, a measure of community quality. Despite its popularity, the Louvain method has been noted for producing internally fragmented and weakly connected communities. In response to these limitations, Traag et al. propose the Leiden algorithm, which incorporates a refinement phase between the local-moving and aggregation phases. This refinement step enables vertices to explore and potentially establish sub-communities within the identified communities from the local-moving phase.
 
-[![](https://i.imgur.com/fiZPpQy.png)][sheets-o1]
+However, the Leiden algorithm is not guaranteed to avoid internally disconnected communities, a flaw that has largely escaped attention. We illustrate this through both a [counterexample][report1] and [empirical findings][report1]. In our experimental evaluation, we note that approximately `1.3×10^−4` fraction of the communities identified using the original Leiden implementation exhibit this issue. Although this fraction is small, addressing the presence of disconnected communities is crucial for ensuring the accuracy and dependability of community detection algorithms. Several studies have addressed internally disconnected communities as a post-processing step. However, this may exacerbate the problem of poorly connected communities. Furthermore, the surge in data volume and their graph representations in recent years has been unprecedented. Nonetheless, applying the original Leiden algorithm to massive graphs has posed computational hurdles, primarily due to its inherently sequential nature, akin to the Louvain method. To tackle these challenged, we propose two new *parallel algorithms*: **[GSP-Leiden]** and **[GSP-Louvain]**, based on the [Leiden] and [Louvain] algorithms, respectively.
 
-Below we plot the speedup of GVE-Leiden wrt original Leiden, igraph Leiden, and NetworKit Leiden.
+Below we plot the time taken by the [original Leiden], [igraph] Leiden, [NetworKit] Leiden, GSP-Leiden, and GSP-Louvain on 13 different graphs. GSP-Leiden surpasses the original Leiden, igraph Leiden, and NetworKit Leiden by `190×`, `46×`, and `3.4×` respectively, achieving a processing rate of `195M` edges/s on a `3.8𝐵` edge graph.
 
-[![](https://i.imgur.com/le5WOJk.png)][sheets-o1]
+[![](https://i.imgur.com/bgTuZsm.png)][sheets-o1]
 
-Next, we plot the modularity of communities identified by original Leiden, igraph Leiden, NetworKit Leiden, and GVE-Leiden. GVE-Leiden on average obtains `0.1%` lower modularity than original Leiden and igraph Leiden, and `26%` higher modularity than NetworKit Leiden (especially on road networks and protein k-mer graphs).
+Below we plot the speedup of GSP-Leiden and GSP-Louvain wrt original Leiden, igraph Leiden, and NetworKit Leiden.
 
-[![](https://i.imgur.com/h6vOSE9.png)][sheets-o1]
+[![](https://i.imgur.com/8jtfe7p.png)][sheets-o1]
 
-Then, we plot the fraction of disconnected communities obtained with each implementation. Here, the absence of bars indicates the absence of disconnected communities. Communities identified by GVE-Leiden on average have `88×`, `145×`, and `0.76×` disconnected communities than the original Leiden, igraph Leiden, and NetworKit Leiden respectively. While this compares unfavorably with the original Leiden and igraph Leiden (especially on social networks, road networks, and protein k-mer graphs), it may be simpler to split the disconnected communities obtained from GVE-Leiden as a post-processing step. We would like to address this issue some time in the future.
+Next, we compare the modularity of communities identified by the original Leiden algorithm, igraph Leiden, NetworKit Leiden, GSP-Leiden, and GSP-Leiden. On average, GSP-Leiden achieves `0.07%` and `0.02%` lower modularity than the original Leiden and igraph Leiden, respectively, and `26%` higher modularity than NetworKit Leiden, particularly evident on road networks and protein k-mer graphs.
 
-[![](https://i.imgur.com/BLsirqM.png)][sheets-o1]
+[![](https://i.imgur.com/gKKH1dg.png)][sheets-o1]
 
-Finally, we plot the strong scaling behaviour of GVE-Leiden. With doubling of threads, GVE-Leiden exhibits an average performance scaling of `1.6×`.
+Finally, we plot the fraction of disconnected communities identified by each implementation. Absence of bars indicates the absence of disconnected communities. As anticipated, both GSP-Leiden and GSP-Louvain detect no disconnected communities. However, on average, the original Leiden, igraph Leiden, and NetworKit Leiden exhibit fractions of disconnected communities amounting to `1.3×10^−4`, `7.9×10^−5`, and `1.5×10^−2`, respectively, particularly on web graphs (and especially on social networks with NetworKit Leiden).
 
-[![](https://i.imgur.com/WxkvAUm.png)][sheets-o2]
+[![](https://i.imgur.com/FgI5GT9.png)][sheets-o1]
 
-Refer to our technical report for more details:
-[GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting][report].
+Refer to our technical reports for more details: \
+[GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting][report1]. \
+[Addressing Internally-Disconnected Communities in Leiden and Louvain Community Detection Algorithms][report2].
 
 <br>
 
@@ -33,7 +36,8 @@ Refer to our technical report for more details:
 > You can just copy `main.sh` to your system and run it. \
 > For the code, refer to `main.cxx`.
 
-[Leiden algorithm]: https://www.nature.com/articles/s41598-019-41695-z
+[Leiden]: https://www.nature.com/articles/s41598-019-41695-z
+[Louvain]: https://arxiv.org/abs/0803.0476
 [original Leiden]: https://github.com/vtraag/libleidenalg
 [igraph]: https://github.com/igraph/igraph
 [NetworKit]: https://github.com/networkit/networkit
@@ -43,7 +47,11 @@ Refer to our technical report for more details:
 [SuiteSparse Matrix Collection]: https://sparse.tamu.edu
 [sheets-o1]: https://docs.google.com/spreadsheets/d/1oyx44kRewQmk9y23V-lJWwx51qYlGRxNR2kiT_tiMdo/edit?usp=sharing
 [sheets-o2]: https://docs.google.com/spreadsheets/d/12CzNfXe3yO4NsOvs7sbmcwC6qBHTi6DmBF7yK2eXf7I/edit?usp=sharing
-[report]: https://arxiv.org/abs/2312.13936
+[report1]: https://arxiv.org/abs/2312.13936
+[report2]: https://arxiv.org/abs/2402.11454
+[GSP-Leiden]: https://github.com/puzzlef/leiden-communities-openmp
+[GSP-Louvain]: https://github.com/puzzlef/louvain-communities-openmp
+[arXiv-2312.13936]: https://github.com/puzzlef/leiden-communities-openmp/tree/arXiv-2312.13936
 
 <br>
 <br>
@@ -77,7 +85,9 @@ The code structure of GVE-Leiden is as follows:
 - inc/duplicate.hxx: Graph duplicating functions
 - inc/Graph.hxx: Graph data structure functions
 - inc/leiden.hxx: Leiden algorithm functions
+- inc/leidenSplit.hxx: Leiden with no disconnected communities
 - inc/louvian.hxx: Louvian algorithm functions
+- inc/louvainSplit.hxx: Louvain with no disconnected communities
 - inc/main.hxx: Main header
 - inc/mtx.hxx: Graph file reading functions
 - inc/properties.hxx: Graph Property functions
@@ -109,7 +119,7 @@ Note that each branch in this repository contains code for a specific experiment
 <br>
 
 
-[![](https://i.imgur.com/Z0g3W0u.jpg)](https://www.youtube.com/watch?v=yqO7wVBTuLw&pp)<br>
+[![](https://i.imgur.com/atJbkL1.png)](https://www.youtube.com/watch?v=yqO7wVBTuLw&pp)<br>
 [![ORG](https://img.shields.io/badge/org-puzzlef-green?logo=Org)](https://puzzlef.github.io)
 [![DOI](https://zenodo.org/badge/652482935.svg)](https://zenodo.org/doi/10.5281/zenodo.10428321)
 
