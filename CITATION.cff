@@ -5,6 +5,6 @@ authors:
     given-names: Subhajit
     orcid: https://orcid.org/0000-0001-5140-6578
 title: "puzzlef/leiden-communities-openmp: Design of OpenMP-based Parallel Leiden algorithm for community detection"
-version: 1.0.0
-doi: 10.5281/zenodo.10428322
-date-released: 2023-12-24
+version: 2.0.0
+doi: 10.5281/zenodo.10684504
+date-released: 2024-02-20

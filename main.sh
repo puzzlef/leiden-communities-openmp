@@ -4,7 +4,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=64
 #SBATCH --exclusive
-#SBATCH --mem=30gb
 #SBATCH --job-name slurm
 #SBATCH --output=slurm.out
 # source scl_source enable gcc-toolset-11

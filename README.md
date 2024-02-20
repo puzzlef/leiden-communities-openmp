@@ -45,8 +45,7 @@ Refer to our technical reports for more details: \
 [Prof. Dip Sankar Banerjee]: https://sites.google.com/site/dipsankarban/
 [Prof. Kishore Kothapalli]: https://faculty.iiit.ac.in/~kkishore/
 [SuiteSparse Matrix Collection]: https://sparse.tamu.edu
-[sheets-o1]: https://docs.google.com/spreadsheets/d/1oyx44kRewQmk9y23V-lJWwx51qYlGRxNR2kiT_tiMdo/edit?usp=sharing
-[sheets-o2]: https://docs.google.com/spreadsheets/d/12CzNfXe3yO4NsOvs7sbmcwC6qBHTi6DmBF7yK2eXf7I/edit?usp=sharing
+[sheets-o1]: https://docs.google.com/spreadsheets/d/1N8eoVV5AUFYUKuvZBbHvL1BPc86xgmgAPA_t4pIC1gk/edit?usp=sharing
 [report1]: https://arxiv.org/abs/2312.13936
 [report2]: https://arxiv.org/abs/2402.11454
 [GSP-Leiden]: https://github.com/puzzlef/leiden-communities-openmp
