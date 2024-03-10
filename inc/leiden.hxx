@@ -614,14 +614,30 @@ inline void leidenChangeCommunityW(vector<K>& vcom, vector<W>& ctot, const G& x,
  * @param c community to move to
  * @param vtot total edge weight of each vertex
  */
-template <class G, class K, class W>
-inline void leidenChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G& x, K u, K c, const vector<W>& vtot) {
+template <bool REFINE=false, class G, class K, class W>
+inline bool leidenChangeCommunityOmpW(vector<K>& vcom, vector<W>& ctot, const G& x, K u, K c, const vector<W>& vtot) {
   K d = vcom[u];
-  #pragma omp atomic
-  ctot[d] -= vtot[u];
+  if (REFINE) {
+    W ctotd = W();
+    #pragma omp atomic capture
+    {
+      ctotd    = ctot[d];
+      ctot[d] -= vtot[u];
+    }
+    if (ctotd  > vtot[u]) {
+      #pragma omp atomic
+      ctot[d] += vtot[u];
+      return false;
+    }
+  }
+  else {
+    #pragma omp atomic
+    ctot[d] -= vtot[u];
+  }
   #pragma omp atomic
   ctot[c] += vtot[u];
   vcom[u] = c;
+  return true;
 }
 #endif
 #pragma endregion
@@ -729,7 +745,7 @@ inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vec
       leidenClearScanW(*vcs[t], *vcout[t]);
       leidenScanCommunitiesW<false, REFINE>(*vcs[t], *vcout[t], x, u, vcom, vcob);
       auto [c, e] = leidenChooseCommunity<false, RANDOM>(*rng[t], x, u, vcom, vtot, ctot, *vcs[t], *vcout[t], M, R);
-      if (c)      { leidenChangeCommunityOmpW(vcom, ctot, x, u, c, vtot); x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); }); }
+      if (c && leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, c, vtot)) x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); });
       vaff[u] = B();
       el += e;  // l1-norm
     }
