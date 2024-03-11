@@ -65,47 +65,21 @@ void runExperiment(const G& x) {
   int repeat = REPEAT_METHOD;
   double   M = edgeWeightOmp(x)/2;
   // Follow a specific result logging format, which can be easily parsed later.
-  auto flog = [&](const auto& ans, const char *technique) {
+  auto flog = [&](const auto& ans, const char *technique, int numThreads) {
     printf(
-      "{%09.1fms, %09.1fms mark, %09.1fms init, %09.1fms firstpass, %09.1fms locmove, %09.1fms refine, %09.1fms aggr, %.3e aff, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
-      ans.time, ans.markingTime, ans.initializationTime, ans.firstPassTime, ans.localMoveTime, refinementTime(ans), ans.aggregationTime,
+      "{%03d threads} -> {%09.1fms, %09.1fms mark, %09.1fms init, %09.1fms firstpass, %09.1fms locmove, %09.1fms refine, %09.1fms aggr, %.3e aff, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
+      numThreads, ans.time, ans.markingTime, ans.initializationTime, ans.firstPassTime, ans.localMoveTime, refinementTime(ans), ans.aggregationTime,
       double(ans.affectedVertices), ans.iterations, ans.passes, getModularity(x, ans, M),
       countValue(communitiesDisconnectedOmp(x, ans.membership), char(1)),
       communities(x, ans.membership).size(), technique
     );
   };
   // Get community memberships on original graph (static).
+  for (int numThreads=1; numThreads<=MAX_THREADS; numThreads*=2)
   {
-    auto a0 = louvainStaticOmp(x, {repeat});
-    flog(a0, "louvainStaticOmp");
-  }
-  {
-    auto b0 = leidenStaticOmp<false, false>(rnd, x, {repeat});
-    flog(b0, "leidenStaticOmpGreedy");
+    omp_set_num_threads(numThreads);
     auto b1 = leidenStaticOmp<false,  true>(rnd, x, {repeat});
-    flog(b1, "leidenStaticOmpGreedyOrg");
-    auto c0 = leidenStaticOmp<false, false>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c0, "leidenStaticOmpGreedyMedium");
-    auto c1 = leidenStaticOmp<false,  true>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c1, "leidenStaticOmpGreedyMediumOrg");
-    auto d0 = leidenStaticOmp<false, false>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d0, "leidenStaticOmpGreedyHeavy");
-    auto d1 = leidenStaticOmp<false,  true>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d1, "leidenStaticOmpGreedyHeavyOrg");
-  }
-  {
-    auto b2 = leidenStaticOmp<true, false>(rnd, x, {repeat});
-    flog(b2, "leidenStaticOmpRandom");
-    auto b3 = leidenStaticOmp<true,  true>(rnd, x, {repeat});
-    flog(b3, "leidenStaticOmpRandomOrg");
-    auto c2 = leidenStaticOmp<true, false>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c2, "leidenStaticOmpRandomMedium");
-    auto c3 = leidenStaticOmp<true,  true>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c3, "leidenStaticOmpRandomMediumOrg");
-    auto d2 = leidenStaticOmp<true, false>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d2, "leidenStaticOmpRandomHeavy");
-    auto d3 = leidenStaticOmp<true,  true>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d3, "leidenStaticOmpRandomHeavyOrg");
+    flog(b1, "leidenStaticOmpGreedyOrg", numThreads);
   }
 }
 
