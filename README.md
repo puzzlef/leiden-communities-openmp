@@ -4,21 +4,21 @@ Community detection involves identifying subsets of vertices that display higher
 
 Nevertheless, the original Leiden algorithm encounters computational bottlenecks when applied to massive graphs, primarily due to its inherently sequential nature, akin to the Louvain method. In scenarios where scalability is crucial, the development of an optimized parallel Leiden algorithm becomes essential, especially in the multicore/shared memory setting, given its energy efficiency and the prevalence of hardware with large memory sizes. Despite existing studies proposing various parallelization techniques for the Leiden algorithm, they do not address optimization for the aggregation phase, which emerges as a bottleneck after optimizing the local-moving phase. Additionally, several optimization techniques applicable to the Louvain method are also relevant to the Leiden algorithm. To tackle these challenges, we present **GVE-Leiden**, an optimized *parallel implementation of the Leiden algorithm* designed for shared memory multicores.
 
-Below we plot the time taken by the [original Leiden], [igraph] Leiden, [NetworKit] Leiden, and GVE-Leiden on 13 different graphs. GVE-Leiden surpasses the original Leiden, igraph Leiden, and NetworKit Leiden by `436×`, `104×`, and `8.2×` respectively, achieving a processing rate of `403M` edges/s on a `3.8𝐵` edge graph.
+Below we plot the time taken by the [original Leiden], [igraph] Leiden, [NetworKit] Leiden, [cuGraph] Leiden, and GVE-Leiden on 13 different graphs. GVE-Leiden surpasses the original Leiden, igraph Leiden, NetworKit Leiden, and cuGraph Leiden by `436×`, `104×`, `8.2×`, and `3.0×` respectively, achieving a processing rate of `403M` edges/s on a `3.8𝐵` edge graph.
 
-[![](https://i.imgur.com/cEjODe3.png)][sheets-o1]
+[![](https://i.imgur.com/jdYCdBC.png)][sheets-o1]
 
-Below we plot the speedup of GVE-Leiden wrt original Leiden, igraph Leiden, and NetworKit Leiden.
+Below we plot the speedup of GVE-Leiden wrt original Leiden, igraph Leiden, NetworKit Leiden, and cuGraph Leiden.
 
-[![](https://i.imgur.com/dmi8AaL.jpeg)][sheets-o1]
+[![](https://i.imgur.com/9twKzxS.png)][sheets-o1]
 
-Next, we plot the modularity of communities identified by original Leiden, igraph Leiden, NetworKit Leiden, and GVE-Leiden. GVE-Leiden on average obtains `0.3%` lower modularity than original Leiden and igraph Leiden, and `25%` higher modularity than NetworKit Leiden (especially on road networks and protein k-mer graphs).
+Next, we plot the modularity of communities identified by original Leiden, igraph Leiden, NetworKit Leiden, cuGraph Leiden, and GVE-Leiden. GVE-Leiden on average obtains `0.3%` lower modularity than original Leiden and igraph Leiden, `25%` higher modularity than NetworKit Leiden (especially on road networks and protein k-mer graphs), and 3.5% higher modularity that cuGraph Leiden (primarily due to cuGraph Leiden’s inability to run on well-clusterable graphs).
 
-[![](https://i.imgur.com/qv8ZBBX.jpeg)][sheets-o1]
+[![](https://i.imgur.com/ouSqncV.png)][sheets-o1]
 
-Then, we plot the fraction of disconnected communities obtained with each implementation. Here, the absence of bars signifies no disconnected communities. On average, communities identified by original Leiden, igraph Leiden, and NetworKit Leiden have fractions of disconnected communities as follows: `1.3×10^−4`, `7.9×10^−5`, and `1.5×10^−2` respectively. None of the communities identified by GVE-Leiden are internally-disconnected. The original Leiden algorithm ensures no disconnected communities, so those observed with original Leiden, igraph Leiden, and NetworKit Leiden are likely due to implementation issues.
+Then, we plot the fraction of disconnected communities obtained with each implementation. Here, the absence of bars signifies no disconnected communities. On average, communities identified by NetworKit Leiden and cuGraph Leiden have fractions of disconnected communities as follows: `1.5×10^−2` and `6.6×10^−5` respectively. None of the communities identified by the original Leiden, igraph Leiden, and GVE-Leiden are internally-disconnected. As the Leiden algorithm guarantees the absence of disconnected communities, those observed with NetworKit Leiden and cuGraph Leiden are likely due to implementation issues.
 
-[![](https://i.imgur.com/aDwXaih.jpeg)][sheets-o1]
+[![](https://i.imgur.com/eeDsyHg.png)][sheets-o1]
 
 Refer to our technical report for more details (updated to use *constrained merge*): \
 [GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting][report].
@@ -33,6 +33,7 @@ Refer to our technical report for more details (updated to use *constrained merg
 [original Leiden]: https://github.com/vtraag/libleidenalg
 [igraph]: https://github.com/igraph/igraph
 [NetworKit]: https://github.com/networkit/networkit
+[cuGraph]: https://github.com/rapidsai/cugraph
 [community detection]: https://en.wikipedia.org/wiki/Community_search
 [Prof. Dip Sankar Banerjee]: https://sites.google.com/site/dipsankarban/
 [Prof. Kishore Kothapalli]: https://faculty.iiit.ac.in/~kkishore/
