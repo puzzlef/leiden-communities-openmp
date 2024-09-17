@@ -1,5 +1,4 @@
 #include <utility>
-#include <random>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -60,8 +59,6 @@ template <class G>
 void runExperiment(const G& x) {
   using K = typename G::key_type;
   using V = typename G::edge_value_type;
-  random_device dev;
-  default_random_engine rnd(dev());
   int repeat = REPEAT_METHOD;
   double   M = edgeWeightOmp(x)/2;
   // Follow a specific result logging format, which can be easily parsed later.
@@ -80,32 +77,18 @@ void runExperiment(const G& x) {
     flog(a0, "louvainStaticOmp");
   }
   {
-    auto b0 = leidenStaticOmp<false, false>(rnd, x, {repeat});
+    auto b0 = leidenStaticOmp<false>(x, {repeat});
     flog(b0, "leidenStaticOmpGreedy");
-    auto b1 = leidenStaticOmp<false,  true>(rnd, x, {repeat});
+    auto b1 = leidenStaticOmp<true> (x, {repeat});
     flog(b1, "leidenStaticOmpGreedyOrg");
-    auto c0 = leidenStaticOmp<false, false>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
+    auto c0 = leidenStaticOmp<false>(x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
     flog(c0, "leidenStaticOmpGreedyMedium");
-    auto c1 = leidenStaticOmp<false,  true>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
+    auto c1 = leidenStaticOmp<true> (x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
     flog(c1, "leidenStaticOmpGreedyMediumOrg");
-    auto d0 = leidenStaticOmp<false, false>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
+    auto d0 = leidenStaticOmp<false>(x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
     flog(d0, "leidenStaticOmpGreedyHeavy");
-    auto d1 = leidenStaticOmp<false,  true>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
+    auto d1 = leidenStaticOmp<true> (x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
     flog(d1, "leidenStaticOmpGreedyHeavyOrg");
-  }
-  {
-    auto b2 = leidenStaticOmp<true, false>(rnd, x, {repeat});
-    flog(b2, "leidenStaticOmpRandom");
-    auto b3 = leidenStaticOmp<true,  true>(rnd, x, {repeat});
-    flog(b3, "leidenStaticOmpRandomOrg");
-    auto c2 = leidenStaticOmp<true, false>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c2, "leidenStaticOmpRandomMedium");
-    auto c3 = leidenStaticOmp<true,  true>(rnd, x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c3, "leidenStaticOmpRandomMediumOrg");
-    auto d2 = leidenStaticOmp<true, false>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d2, "leidenStaticOmpRandomHeavy");
-    auto d3 = leidenStaticOmp<true,  true>(rnd, x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d3, "leidenStaticOmpRandomHeavyOrg");
   }
 }
 
