@@ -57,8 +57,6 @@ inline float refinementTime(const LeidenResult<K, W>& a) {
 
 template <class G>
 void runExperiment(const G& x) {
-  using K = typename G::key_type;
-  using V = typename G::edge_value_type;
   int repeat = REPEAT_METHOD;
   double   M = edgeWeightOmp(x)/2;
   // Follow a specific result logging format, which can be easily parsed later.

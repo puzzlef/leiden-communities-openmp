@@ -34,7 +34,7 @@ DEFINES=(""
 )
 
 # Compile
-g++ ${DEFINES[*]} -std=c++17 -O3 -fopenmp main.cxx
+g++ ${DEFINES[*]} -std=c++17 -O3 -fopenmp main.cxx  # -Wall -Wno-unknown-pragmas
 
 # Run on each graph
 runEach() {

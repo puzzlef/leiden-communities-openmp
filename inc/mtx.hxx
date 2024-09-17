@@ -156,7 +156,6 @@ inline void readMtxDoOmp(istream& s, bool weighted, FH fh, FB fb) {
   size_t n = max(rows, cols);
   if (n==0) return;
   // Process body lines in parallel.
-  const int THREADS = omp_get_max_threads();
   const int LINES   = 131072;
   vector<string> lines(LINES);
   vector<tuple<size_t, size_t, double>> edges(LINES);
