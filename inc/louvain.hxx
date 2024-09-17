@@ -1006,11 +1006,11 @@ inline void louvainAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K
  * @param fa is vertex allowed to be updated? (u)
  * @returns louvain result
  */
-template <bool DYNAMIC=false, class FLAG=char, class G, class FI, class FM, class FA>
+template <bool DYNAMIC=false, class G, class FI, class FM, class FA>
 inline auto louvainInvoke(const G& x, const LouvainOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
   using  W = LOUVAIN_WEIGHT_TYPE;
-  using  B = FLAG;
+  using  B = char;
   // Options.
   double R = o.resolution;
   int    L = o.maxIterations, l = 0;
@@ -1080,10 +1080,10 @@ inline auto louvainInvoke(const G& x, const LouvainOptions& o, FI fi, FM fm, FA 
         else         louvainRenumberCommunitiesW(vcom, cv.degrees, y);
         if (isFirst) {}
         else         louvainLookupCommunitiesU(ucom, vcom);
-        cv.respan(CN); z.respan(CN);
-        if (isFirst) louvainCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, x, ucom);
-        else         louvainCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, y, vcom);
         ta += measureDuration([&]() {
+          cv.respan(CN); z.respan(CN);
+          if (isFirst) louvainCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, x, ucom);
+          else         louvainCommunityVerticesW(cv.offsets, cv.degrees, cv.edgeKeys, y, vcom);
           if (isFirst) louvainAggregateW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys);
           else         louvainAggregateW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys);
         });
@@ -1116,11 +1116,11 @@ inline auto louvainInvoke(const G& x, const LouvainOptions& o, FI fi, FM fm, FA 
  * @param fa is vertex allowed to be updated? (u)
  * @returns louvain result
  */
-template <bool DYNAMIC=false, class FLAG=char, class G, class FI, class FM, class FA>
+template <bool DYNAMIC=false, class G, class FI, class FM, class FA>
 inline auto louvainInvokeOmp(const G& x, const LouvainOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
   using  W = LOUVAIN_WEIGHT_TYPE;
-  using  B = FLAG;
+  using  B = char;
   // Options.
   double R = o.resolution;
   int    L = o.maxIterations, l = 0;
@@ -1194,10 +1194,10 @@ inline auto louvainInvokeOmp(const G& x, const LouvainOptions& o, FI fi, FM fm, 
         else         louvainRenumberCommunitiesOmpW(vcom, cv.degrees, bufk, y);
         if (isFirst) {}
         else         louvainLookupCommunitiesOmpU(ucom, vcom);
-        cv.respan(CN); z.respan(CN);
-        if (isFirst) louvainCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, x, ucom);
-        else         louvainCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, y, vcom);
         ta += measureDuration([&]() {
+          cv.respan(CN); z.respan(CN);
+          if (isFirst) louvainCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, x, ucom);
+          else         louvainCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, y, vcom);
           if (isFirst) louvainAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys);
           else         louvainAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys);
         });
@@ -1259,17 +1259,18 @@ inline void louvainSetupInitialsW(vector2d<K>& qs, vector2d<W>& qvtots, vector2d
  * @param o louvain options
  * @returns louvain result
  */
-template <class FLAG=char, class G>
+template <class G>
 inline auto louvainStatic(const G& x, const LouvainOptions& o={}) {
+  using B = char;
   auto fi = [&](auto& vcom, auto& vtot, auto& ctot)  {
     louvainVertexWeightsW(vtot, x);
     louvainInitializeW(vcom, ctot, x, vtot);
   };
   auto fm = [ ](auto& vaff, const auto& vcom, const auto& vtot, const auto& ctot, auto& vcs,  auto& vcout) {
-    fillValueU(vaff, FLAG(1));
+    fillValueU(vaff, B(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return louvainInvoke<false, FLAG>(x, o, fi, fm, fa);
+  return louvainInvoke<false>(x, o, fi, fm, fa);
 }
 
 
@@ -1280,17 +1281,18 @@ inline auto louvainStatic(const G& x, const LouvainOptions& o={}) {
  * @param o louvain options
  * @returns louvain result
  */
-template <class FLAG=char, class G>
+template <class G>
 inline auto louvainStaticOmp(const G& x, const LouvainOptions& o={}) {
+  using B = char;
   auto fi = [&](auto& vcom, auto& vtot, auto& ctot)  {
     louvainVertexWeightsOmpW(vtot, x);
     louvainInitializeOmpW(vcom, ctot, x, vtot);
   };
   auto fm = [ ](auto& vaff, const auto& vcom, const auto& vtot, const auto& ctot, auto& vcs,  auto& vcout) {
-    fillValueOmpU(vaff, FLAG(1));
+    fillValueOmpU(vaff, B(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return louvainInvokeOmp<false, FLAG>(x, o, fi, fm, fa);
+  return louvainInvokeOmp<false>(x, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
