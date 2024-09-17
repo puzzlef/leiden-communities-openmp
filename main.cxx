@@ -75,20 +75,8 @@ void runExperiment(const G& x) {
   {
     auto a0 = louvainStaticOmp(x, {repeat});
     flog(a0, "louvainStaticOmp");
-  }
-  {
-    auto b0 = leidenStaticOmp<false>(x, {repeat});
-    flog(b0, "leidenStaticOmpGreedy");
-    auto b1 = leidenStaticOmp<true> (x, {repeat});
-    flog(b1, "leidenStaticOmpGreedyOrg");
-    auto c0 = leidenStaticOmp<false>(x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c0, "leidenStaticOmpGreedyMedium");
-    auto c1 = leidenStaticOmp<true> (x, {repeat, 1.0, 1e-12, 0.8, 1.0, 100, 100});
-    flog(c1, "leidenStaticOmpGreedyMediumOrg");
-    auto d0 = leidenStaticOmp<false>(x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d0, "leidenStaticOmpGreedyHeavy");
-    auto d1 = leidenStaticOmp<true> (x, {repeat, 1.0, 1e-12, 1.0, 1.0, 100, 100});
-    flog(d1, "leidenStaticOmpGreedyHeavyOrg");
+    auto b0 = leidenStaticOmp(x, {repeat});
+    flog(b0, "leidenStaticOmp");
   }
 }
 
