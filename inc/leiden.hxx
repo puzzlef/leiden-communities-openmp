@@ -1107,11 +1107,11 @@ inline void leidenAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K>
  * @param fa is vertex allowed to be updated? (u)
  * @returns leiden result
  */
-template <bool DYNAMIC=false, bool USEPARENT=false, class FLAG=char, class G, class FI, class FM, class FA>
+template <bool DYNAMIC=false, bool USEPARENT=false, class G, class FI, class FM, class FA>
 inline auto leidenInvoke(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
   using  W = LEIDEN_WEIGHT_TYPE;
-  using  B = FLAG;
+  using  B = char;
   // Options.
   double R = o.resolution;
   int    L = o.maxIterations, l = 0;
@@ -1238,11 +1238,11 @@ inline auto leidenInvoke(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa
  * @param fa is vertex allowed to be updated? (u)
  * @returns leiden result
  */
-template <bool DYNAMIC=false, bool USEPARENT=false, class FLAG=char, class G, class FI, class FM, class FA>
+template <bool DYNAMIC=false, bool USEPARENT=false, class G, class FI, class FM, class FA>
 inline auto leidenInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
   using  W = LEIDEN_WEIGHT_TYPE;
-  using  B = FLAG;
+  using  B = char;
   // Options.
   double R = o.resolution;
   int    L = o.maxIterations, l = 0;
@@ -1402,17 +1402,18 @@ inline void leidenSetupInitialsW(vector2d<K>& qs, vector2d<W>& qvtots, vector2d<
  * @param o leiden options
  * @returns leiden result
  */
-template <bool USEPARENT=false, class FLAG=char, class G>
+template <bool USEPARENT=false, class G>
 inline auto leidenStatic(const G& x, const LeidenOptions& o={}) {
+  using B = char;
   auto fi = [&](auto& vcom, auto& vtot, auto& ctot)  {
     leidenVertexWeightsW(vtot, x);
     leidenInitializeW(vcom, ctot, x, vtot);
   };
   auto fm = [ ](auto& vaff, const auto& vcom, const auto& vtot, const auto& ctot, auto& vcs,  auto& vcout) {
-    fillValueU(vaff, FLAG(1));
+    fillValueU(vaff, B(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvoke<false, USEPARENT, FLAG>(x, o, fi, fm, fa);
+  return leidenInvoke<false, USEPARENT>(x, o, fi, fm, fa);
 }
 
 
@@ -1423,17 +1424,18 @@ inline auto leidenStatic(const G& x, const LeidenOptions& o={}) {
  * @param o leiden options
  * @returns leiden result
  */
-template <bool USEPARENT=false, class FLAG=char, class G>
+template <bool USEPARENT=false, class G>
 inline auto leidenStaticOmp(const G& x, const LeidenOptions& o={}) {
+  using B = char;
   auto fi = [&](auto& vcom, auto& vtot, auto& ctot)  {
     leidenVertexWeightsOmpW(vtot, x);
     leidenInitializeOmpW(vcom, ctot, x, vtot);
   };
   auto fm = [ ](auto& vaff, const auto& vcom, const auto& vtot, const auto& ctot, auto& vcs,  auto& vcout) {
-    fillValueOmpU(vaff, FLAG(1));
+    fillValueOmpU(vaff, B(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenInvokeOmp<false, USEPARENT, FLAG>(x, o, fi, fm, fa);
+  return leidenInvokeOmp<false, USEPARENT>(x, o, fi, fm, fa);
 }
 #endif
 #pragma endregion
