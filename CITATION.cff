@@ -4,7 +4,7 @@ authors:
   - family-names: Sahu
     given-names: Subhajit
     orcid: https://orcid.org/0000-0001-5140-6578
-title: "puzzlef/leiden-communities-openmp: Design of OpenMP-based Parallel Leiden algorithm for community detection"
+title: "GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting"
 version: 1.0.0
-doi: 10.5281/zenodo.10428322
-date-released: 2023-12-24
+doi: 10.48550/arXiv.2312.13936
+date-released: 2023-12-21
