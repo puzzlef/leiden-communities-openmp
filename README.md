@@ -109,7 +109,7 @@ Note that each branch in this repository contains code for a specific experiment
 [![](https://i.imgur.com/Z0g3W0u.jpg)](https://www.youtube.com/watch?v=yqO7wVBTuLw&pp)<br>
 [![ORG](https://img.shields.io/badge/org-puzzlef-green?logo=Org)](https://puzzlef.github.io)
 [![DOI](https://zenodo.org/badge/652482935.svg)](https://zenodo.org/doi/10.5281/zenodo.10428321)
-
+![](https://ga-beacon.deno.dev/G-KD28SG54JQ:hbAybl6nQFOtmVxW4if3xw/github.com/puzzlef/leiden-communities-openmp)
 
 [Prof. Dip Sankar Banerjee]: https://sites.google.com/site/dipsankarban/
 [Prof. Kishore Kothapalli]: https://faculty.iiit.ac.in/~kkishore/
